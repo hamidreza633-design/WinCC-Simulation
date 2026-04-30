@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIMATIC PCS 7 – R&I Simulation | Raw Material Tank → Reactor 1/2</title>
+<style>
+:root {
+  --bg:      #1a1f2e;
+  --panel:   #16213e;
+  --border:  #2a4a7f;
+  --accent:  #00d4ff;
+  --green:   #00e676;
+  --yellow:  #ffea00;
+  --red:     #ff1744;
+  --orange:  #ff6d00;
+  --gray:    #546e7a;
+  --text:    #e0e0e0;
+  --dim:     #78909c;
+  --pipe:    #607d8b;
+  --pipeflow:#00d4ff;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  background:var(--bg);
+  font-family:'Courier New',monospace;
+  color:var(--text);
+  height:100vh;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+
+/* ── Titelleiste ──────────────────────────────────────────────── */
+.titlebar{
+  background:linear-gradient(90deg,#0d1b2a,#1a3a5c,#0d1b2a);
+  border-bottom:2px solid var(--accent);
+  padding:6px 16px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.logo{font-size:18px;font-weight:900;letter-spacing:3px;color:var(--accent);text-shadow:0 0 10px var(--accent);}
+.title-center{font-size:11px;color:var(--dim);letter-spacing:1px;}
+.title-center span{color:var(--text);font-weight:bold;}
+.clock{font-size:12px;color:var(--accent);background:rgba(0,212,255,0.08);border:1px solid var(--border);padding:3px 10px;border-radius:3px;letter-spacing:2px;}
+
+/* ── Statusleiste ─────────────────────────────────────────────── */
+.statusbar{
+  background:var(--panel);border-bottom:1px solid var(--border);
+  padding:4px 16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+}
+.si{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--dim);}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--gray);transition:all .3s;}
+.dot.g{background:var(--green);box-shadow:0 0 6px var(--green);}
+.dot.r{background:var(--red);box-shadow:0 0 6px var(--red);}
+.dot.y{background:var(--yellow);box-shadow:0 0 6px var(--yellow);}
+.dot.b{background:var(--accent);box-shadow:0 0 6px var(--accent);}
+
+/* ── Layout ───────────────────────────────────────────────────── */
+.main{display:grid;grid-template-columns:1fr 270px;flex:1;overflow:hidden;}
+.canvas-area{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;}
+.canvas-area::before{
+  content:'';position:absolute;inset:0;
+  background-image:linear-gradient(rgba(0,212,255,0.03) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(0,212,255,0.03) 1px,transparent 1px);
+  background-size:30px 30px;pointer-events:none;
+}
+svg#ri{width:100%;max-width:720px;height:auto;}
+
+/* ── SVG Styles ───────────────────────────────────────────────── */
+.pipe{stroke:var(--pipe);stroke-width:6;fill:none;stroke-linecap:round;stroke-linejoin:round;}
+.pipe-dash{stroke:var(--dim);stroke-width:2;fill:none;stroke-dasharray:6 4;stroke-linecap:round;}
+.flow{stroke:var(--pipeflow);stroke-width:3.5;fill:none;stroke-dasharray:10 14;stroke-linecap:round;opacity:0;transition:opacity .4s;}
+.flow.on{opacity:1;animation:flowA 1s linear infinite;}
+.flow.rev{animation:flowR 1s linear infinite;opacity:0;}
+.flow.rev.on{opacity:1;}
+@keyframes flowA{to{stroke-dashoffset:-24;}}
+@keyframes flowR{to{stroke-dashoffset:24;}}
+
+/* Tanks */
+.tank-body{fill:#0d2137;stroke:var(--accent);stroke-width:2.5;}
+.tank-liq{transition:height .5s ease,y .5s ease;}
+.tank-cap{fill:none;stroke:var(--accent);stroke-width:2.5;}
+
+/* Pumpe */
+.pump-ring{fill:#0f2a42;stroke:var(--accent);stroke-width:2;}
+.pump-arrow{fill:none;stroke:var(--accent);stroke-width:2.2;stroke-linecap:round;}
+.pump-spin{animation:spin .7s linear infinite;transform-box:fill-box;transform-origin:center;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* Ventile */
+.valve-tri{stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;transition:stroke .3s,fill .3s;}
+.v-closed{stroke:var(--red);fill:rgba(255,23,68,.15);}
+.v-open{stroke:var(--green);fill:rgba(0,230,118,.15);}
+
+/* Labels/Instrumente (Oval) */
+.instr-ell{fill:#0d2137;stroke:var(--accent);stroke-width:1.5;}
+.instr-txt{fill:var(--accent);font-family:'Courier New',monospace;font-size:9px;font-weight:bold;}
+.instr-val{fill:var(--yellow);font-family:'Courier New',monospace;font-size:10px;font-weight:bold;}
+
+/* Setpoint Raute */
+.diamond{fill:#0d2137;stroke:var(--accent);stroke-width:1.5;}
+.diamond-txt{fill:var(--accent);font-size:9px;font-family:'Courier New',monospace;}
+
+/* Section labels */
+.sec-lbl{fill:var(--dim);font-size:11px;font-family:'Courier New',monospace;letter-spacing:.5px;}
+.sec-lbl-main{fill:var(--text);font-size:13px;font-weight:bold;font-family:'Courier New',monospace;}
+
+/* Alarm blink */
+.alm{fill:var(--red);opacity:0;}
+.alm.blink{animation:blk .45s step-start infinite;}
+@keyframes blk{50%{opacity:0;}0%,100%{opacity:1;}}
+
+/* ── Rechtes Panel ────────────────────────────────────────────── */
+.rpanel{
+  background:var(--panel);border-left:2px solid var(--border);
+  display:flex;flex-direction:column;overflow-y:auto;
+}
+.rblock{border-bottom:1px solid var(--border);padding:10px 14px;}
+.rtitle{font-size:9px;letter-spacing:2px;color:var(--accent);text-transform:uppercase;margin-bottom:8px;border-bottom:1px solid rgba(0,212,255,.2);padding-bottom:4px;}
+
+/* Messwerte */
+.mrow{display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);}
+.ml{font-size:10px;color:var(--dim);}
+.mv{font-size:13px;font-weight:bold;color:var(--yellow);min-width:65px;text-align:right;}
+.mu{font-size:9px;color:var(--dim);margin-left:3px;}
+.mv.alarm{color:var(--red);animation:blk .45s step-start infinite;}
+.bar-bg{height:5px;background:rgba(255,255,255,.07);border-radius:3px;margin-top:3px;overflow:hidden;}
+.bar{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--green),var(--accent));transition:width .5s ease;}
+.bar.w{background:linear-gradient(90deg,var(--yellow),var(--orange));}
+.bar.a{background:linear-gradient(90deg,var(--orange),var(--red));}
+
+/* Ziel-Selector */
+.sel-row{display:flex;gap:6px;margin:6px 0;}
+.sel-btn{
+  flex:1;padding:7px 4px;border:1.5px solid var(--border);border-radius:3px;
+  background:rgba(0,212,255,.06);color:var(--dim);font-family:'Courier New',monospace;
+  font-size:10px;cursor:pointer;transition:all .2s;text-align:center;
+}
+.sel-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(0,212,255,.18);box-shadow:0 0 8px rgba(0,212,255,.4);}
+.sel-btn:hover{border-color:var(--accent);color:var(--text);}
+
+/* Setpoint Slider */
+.sp-row{display:flex;align-items:center;gap:8px;margin:6px 0;}
+.sp-lbl{font-size:10px;color:var(--dim);min-width:60px;}
+.sp-val{font-size:13px;font-weight:bold;color:var(--yellow);min-width:45px;text-align:right;}
+input[type=range]{
+  flex:1;-webkit-appearance:none;height:4px;background:var(--border);border-radius:2px;outline:none;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:14px;height:14px;border-radius:50%;
+  background:var(--accent);box-shadow:0 0 6px var(--accent);cursor:pointer;
+}
+
+/* Steuerbuttons */
+.btn-row{display:flex;gap:6px;}
+.btn{
+  flex:1;padding:10px 4px;border:2px solid;border-radius:3px;
+  font-family:'Courier New',monospace;font-size:11px;font-weight:bold;
+  letter-spacing:1px;cursor:pointer;text-transform:uppercase;transition:all .2s;
+}
+.btn:hover{filter:brightness(1.3);}
+.btn:active{transform:scale(.96);}
+.btn-start{background:rgba(0,230,118,.1);border-color:var(--green);color:var(--green);}
+.btn-start.act{background:rgba(0,230,118,.25);box-shadow:0 0 14px rgba(0,230,118,.5);}
+.btn-stop{background:rgba(255,23,68,.1);border-color:var(--red);color:var(--red);}
+.btn-reset{background:rgba(255,234,0,.08);border-color:var(--yellow);color:var(--yellow);}
+
+/* Alarmliste */
+.alm-list{max-height:140px;overflow-y:auto;}
+.ae{display:flex;gap:6px;align-items:flex-start;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:9px;}
+.at{color:var(--dim);min-width:48px;}
+.ag{font-weight:bold;min-width:44px;}
+.ag.r{color:var(--red);}
+.ag.y{color:var(--yellow);}
+.ag.b{color:var(--accent);}
+.am{color:var(--text);}
+.no-alm{font-size:10px;color:var(--gray);text-align:center;padding:8px 0;}
+
+/* Runtime */
+.rt{font-size:20px;font-weight:bold;color:var(--accent);text-align:center;letter-spacing:3px;}
+
+/* scrollbar */
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-track{background:var(--panel);}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+</style>
+</head>
+<body>
+
+<!-- Titelleiste -->
+<div class="titlebar">
+  <div class="logo">SIMATIC</div>
+  <div class="title-center">PCS 7 &nbsp;|&nbsp; <span>WinCC OS</span> &nbsp;|&nbsp; Rohstoffverteilung R-1000 &nbsp;|&nbsp; PNK 1 · 172.16.10.11 &nbsp;/ PNK 2 · 172.16.10.12</div>
+  <div class="clock" id="clock">00:00:00</div>
+</div>
+
+<!-- Statusleiste -->
+<div class="statusbar">
+  <div class="si"><div class="dot g" id="d-pnk1"></div>PNK 1</div>
+  <div class="si"><div class="dot g" id="d-pnk2"></div>PNK 2</div>
+  <div class="si"><div class="dot b"></div>SIMIT VC</div>
+  <div class="si"><div class="dot g"></div>OS-Server</div>
+  <div class="si"><div class="dot g" id="d-np1"></div>NP 111a</div>
+  <div class="si"><div class="dot g" id="d-np2"></div>NP 111b</div>
+  <div class="si" style="margin-left:auto;"><div class="dot" id="d-alm"></div><span id="alm-txt" style="font-size:10px;">KEIN ALARM</span></div>
+</div>
+
+<!-- Hauptbereich -->
+<div class="main">
+
+<!-- SVG Prozessfläche -->
+<div class="canvas-area">
+<svg id="ri" viewBox="0 0 720 560" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <linearGradient id="liqG" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0%" stop-color="#00538a"/>
+    <stop offset="50%" stop-color="#0077b6"/>
+    <stop offset="100%" stop-color="#00538a"/>
+  </linearGradient>
+  <linearGradient id="liqG2" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0%" stop-color="#00538a"/>
+    <stop offset="50%" stop-color="#005f87"/>
+    <stop offset="100%" stop-color="#00538a"/>
+  </linearGradient>
+  <clipPath id="tankClip"><rect x="261" y="41" width="118" height="130"/></clipPath>
+  <clipPath id="r1Clip"><rect x="61" y="441" width="118" height="100"/></clipPath>
+  <clipPath id="r2Clip"><rect x="541" y="441" width="118" height="100"/></clipPath>
+  <filter id="glow"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+
+<!-- ══════════════ ROHRE (Hintergrund) ══════════════ -->
+<!-- Raw Material Tank → NK111 (Zulaufventil) -->
+<line x1="320" y1="172" x2="320" y2="210" class="pipe"/>
+<line x1="320" y1="172" x2="320" y2="210" class="flow" id="f-tank-nk111"/>
+
+<!-- NK111 → Pumpenverteiler -->
+<line x1="320" y1="240" x2="320" y2="268" class="pipe"/>
+<line x1="320" y1="240" x2="320" y2="268" class="flow" id="f-nk111-pump"/>
+
+<!-- Pumpenverteiler horizontal -->
+<line x1="240" y1="280" x2="400" y2="280" class="pipe"/>
+<line x1="240" y1="280" x2="400" y2="280" class="flow" id="f-pump-h"/>
+
+<!-- NP111a (links) → Zusammenführung -->
+<line x1="240" y1="280" x2="240" y2="310" class="pipe"/>
+<line x1="240" y1="310" x2="320" y2="340" class="pipe"/>
+<line x1="240" y1="280" x2="240" y2="310" class="flow" id="f-np1-a"/>
+<line x1="240" y1="310" x2="320" y2="340" class="flow" id="f-np1-b"/>
+
+<!-- NP111b (rechts) → Zusammenführung -->
+<line x1="400" y1="280" x2="400" y2="310" class="pipe"/>
+<line x1="400" y1="310" x2="320" y2="340" class="pipe"/>
+<line x1="400" y1="280" x2="400" y2="310" class="flow" id="f-np2-a"/>
+<line x1="400" y1="310" x2="320" y2="340" class="flow" id="f-np2-b"/>
+
+<!-- → NK112 (FC111 Regelventil) -->
+<line x1="320" y1="340" x2="320" y2="372" class="pipe"/>
+<line x1="320" y1="340" x2="320" y2="372" class="flow" id="f-to-nk112"/>
+
+<!-- NK112 → horizontale Verteilung -->
+<line x1="320" y1="402" x2="320" y2="420" class="pipe"/>
+<line x1="120" y1="420" x2="520" y2="420" class="pipe"/>
+<line x1="320" y1="402" x2="320" y2="420" class="flow" id="f-nk112-h1"/>
+<line x1="120" y1="420" x2="520" y2="420" class="flow" id="f-nk112-h2"/>
+
+<!-- → NK113 → Reactor 1 -->
+<line x1="120" y1="420" x2="120" y2="452" class="pipe"/>
+<line x1="120" y1="482" x2="120" y2="441" class="pipe"/>
+<line x1="120" y1="420" x2="120" y2="452" class="flow" id="f-nk113-a"/>
+<line x1="120" y1="482" x2="120" y2="445" class="flow" id="f-nk113-b"/>
+
+<!-- → NK114 → Reactor 2 -->
+<line x1="520" y1="420" x2="520" y2="452" class="pipe"/>
+<line x1="520" y1="482" x2="520" y2="441" class="pipe"/>
+<line x1="520" y1="420" x2="520" y2="452" class="flow" id="f-nk114-a"/>
+<line x1="520" y1="482" x2="520" y2="445" class="flow" id="f-nk114-b"/>
+
+<!-- Sel Target Steuerlinie (gestrichelt) -->
+<polyline points="320,420 320,510 200,510" class="pipe-dash" id="sel-line"/>
+<line x1="120" y1="510" x2="120" y2="460" class="pipe-dash"/>
+<line x1="320" y1="510" x2="520" y2="510" class="pipe-dash"/>
+<line x1="520" y1="510" x2="520" y2="460" class="pipe-dash"/>
+
+<!-- FC111 Messleitung (gestrichelt) -->
+<line x1="380" y1="387" x2="440" y2="387" class="pipe-dash"/>
+
+<!-- LI111 Messleitung (gestrichelt) -->
+<line x1="380" y1="80" x2="440" y2="80" class="pipe-dash"/>
+
+<!-- Set Vol Leitung (gestrichelt) -->
+<line x1="210" y1="80" x2="262" y2="80" class="pipe-dash"/>
+
+<!-- ══════════════ RAW MATERIAL TANK ══════════════ -->
+<!-- Behälter-Körper -->
+<rect x="261" y="41" width="118" height="130" rx="4" class="tank-body"/>
+<!-- Flüssigkeit -->
+<rect id="liq-tank" x="262" y="130" width="116" height="40"
+      clip-path="url(#tankClip)" fill="url(#liqG)"/>
+<!-- Deckel (konisch) -->
+<polyline points="261,44 320,22 379,44" class="tank-cap"/>
+<!-- Punkt (Schwimmer) -->
+<circle id="float-dot" cx="320" cy="120" r="5" fill="var(--accent)" filter="url(#glow)"/>
+<!-- Label -->
+<text x="320" y="105" text-anchor="middle" class="sec-lbl-main">R-1000</text>
+<text x="320" y="118" text-anchor="middle" class="sec-lbl">Raw Material Tank</text>
+
+<!-- ══════════════ INSTRUMENTE / REGLER ══════════════ -->
+
+<!-- LI 111 (Füllstand-Messumformer, rechts oben) -->
+<ellipse cx="462" cy="80" rx="22" ry="14" class="instr-ell"/>
+<text x="462" y="77" text-anchor="middle" class="instr-txt">LI</text>
+<text x="462" y="88" text-anchor="middle" class="instr-txt">111</text>
+
+<!-- LI 111 Wert -->
+<text id="li111-val" x="500" y="78" class="instr-val">--.-</text>
+<text x="500" y="89" class="instr-txt">%</text>
+
+<!-- Set Vol (Raute, links) -->
+<polygon points="190,80 210,67 230,80 210,93" class="diamond"/>
+<text x="210" y="77" text-anchor="middle" class="diamond-txt">Set</text>
+<text x="210" y="88" text-anchor="middle" class="diamond-txt">Vol</text>
+
+<!-- NK 111 Ventil (unter Tank) -->
+<!-- Ventilkörper: zwei Dreiecke (Siemens-Stil) -->
+<g id="vNK111">
+  <polygon points="308,210 332,210 320,228" class="valve-tri v-closed" id="vNK111-t1"/>
+  <polygon points="308,240 332,240 320,222" class="valve-tri v-closed" id="vNK111-t2"/>
+  <line x1="320" y1="210" x2="320" y2="240" stroke="var(--red)" stroke-width="1.5"/>
+</g>
+<ellipse cx="354" cy="224" rx="20" ry="12" class="instr-ell"/>
+<text x="354" y="221" text-anchor="middle" class="instr-txt">NK</text>
+<text x="354" y="231" text-anchor="middle" class="instr-txt">111</text>
+
+<!-- NP 111a PUMPE (links) -->
+<g id="pumpA">
+  <circle cx="240" cy="295" r="20" class="pump-ring"/>
+  <g id="pumpA-blade" class="pump-spin" style="transform-origin:240px 295px;animation:none;">
+    <line x1="240" y1="281" x2="240" y2="309" class="pump-arrow"/>
+    <line x1="226" y1="295" x2="254" y2="295" class="pump-arrow"/>
+    <line x1="230" y1="285" x2="250" y2="305" class="pump-arrow" opacity=".5"/>
+    <line x1="250" y1="285" x2="230" y2="305" class="pump-arrow" opacity=".5"/>
+  </g>
+  <circle cx="240" cy="295" r="4" fill="var(--accent)"/>
+</g>
+<ellipse cx="196" cy="295" rx="20" ry="12" class="instr-ell"/>
+<text x="196" y="292" text-anchor="middle" class="instr-txt">NP</text>
+<text x="196" y="302" text-anchor="middle" class="instr-txt">111a</text>
+
+<!-- NP 111b PUMPE (rechts) -->
+<g id="pumpB">
+  <circle cx="400" cy="295" r="20" class="pump-ring"/>
+  <g id="pumpB-blade" class="pump-spin" style="transform-origin:400px 295px;animation:none;">
+    <line x1="400" y1="281" x2="400" y2="309" class="pump-arrow"/>
+    <line x1="386" y1="295" x2="414" y2="295" class="pump-arrow"/>
+    <line x1="390" y1="285" x2="410" y2="305" class="pump-arrow" opacity=".5"/>
+    <line x1="410" y1="285" x2="390" y2="305" class="pump-arrow" opacity=".5"/>
+  </g>
+  <circle cx="400" cy="295" r="4" fill="var(--accent)"/>
+</g>
+<ellipse cx="444" cy="295" rx="20" ry="12" class="instr-ell"/>
+<text x="444" y="292" text-anchor="middle" class="instr-txt">NP</text>
+<text x="444" y="302" text-anchor="middle" class="instr-txt">111b</text>
+
+<!-- NK 112 Regelventil + FC111 -->
+<g id="vNK112">
+  <polygon points="308,372 332,372 320,390" class="valve-tri v-closed" id="vNK112-t1"/>
+  <polygon points="308,402 332,402 320,384" class="valve-tri v-closed" id="vNK112-t2"/>
+  <line x1="320" y1="372" x2="320" y2="402" stroke="var(--red)" stroke-width="1.5"/>
+</g>
+<ellipse cx="354" cy="387" rx="20" ry="12" class="instr-ell"/>
+<text x="354" y="384" text-anchor="middle" class="instr-txt">NK</text>
+<text x="354" y="394" text-anchor="middle" class="instr-txt">112</text>
+<!-- FC 111 (Durchflussregler) -->
+<ellipse cx="458" cy="387" rx="22" ry="14" class="instr-ell"/>
+<text x="458" y="384" text-anchor="middle" class="instr-txt">FC</text>
+<text x="458" y="394" text-anchor="middle" class="instr-txt">111</text>
+<!-- FC Wert -->
+<text id="fc111-val" x="490" y="385" class="instr-val">--.-</text>
+<text x="490" y="395" class="instr-txt">m³/h</text>
+
+<!-- NK 113 Ventil → Reactor 1 -->
+<g id="vNK113">
+  <polygon points="108,452 132,452 120,470" class="valve-tri v-closed" id="vNK113-t1"/>
+  <polygon points="108,482 132,482 120,464" class="valve-tri v-closed" id="vNK113-t2"/>
+  <line x1="120" y1="452" x2="120" y2="482" stroke="var(--red)" stroke-width="1.5"/>
+</g>
+<ellipse cx="74" cy="467" rx="20" ry="12" class="instr-ell"/>
+<text x="74" y="464" text-anchor="middle" class="instr-txt">NK</text>
+<text x="74" y="474" text-anchor="middle" class="instr-txt">113</text>
+
+<!-- NK 114 Ventil → Reactor 2 -->
+<g id="vNK114">
+  <polygon points="508,452 532,452 520,470" class="valve-tri v-closed" id="vNK114-t1"/>
+  <polygon points="508,482 532,482 520,464" class="valve-tri v-closed" id="vNK114-t2"/>
+  <line x1="520" y1="452" x2="520" y2="482" stroke="var(--red)" stroke-width="1.5"/>
+</g>
+<ellipse cx="556" cy="467" rx="20" ry="12" class="instr-ell"/>
+<text x="556" y="464" text-anchor="middle" class="instr-txt">NK</text>
+<text x="556" y="474" text-anchor="middle" class="instr-txt">114</text>
+
+<!-- ══════════════ REACTOR 1 ══════════════ -->
+<rect x="61" y="441" width="118" height="100" rx="4" class="tank-body"/>
+<rect id="liq-r1" x="62" y="510" width="116" height="30"
+      clip-path="url(#r1Clip)" fill="url(#liqG2)"/>
+<polyline points="61,444 120,425 179,444" class="tank-cap"/>
+<text x="120" y="478" text-anchor="middle" class="sec-lbl-main" font-size="12">R-1</text>
+<text x="120" y="492" text-anchor="middle" class="sec-lbl">Reactor 1</text>
+<!-- Füllstand Reactor 1 -->
+<text id="r1-pct" x="120" y="530" text-anchor="middle" class="instr-val" font-size="10">0 %</text>
+<!-- Alarm icon R1 -->
+<text id="alm-r1" x="120" y="462" text-anchor="middle" font-size="16" class="alm">⚠</text>
+
+<!-- ══════════════ REACTOR 2 ══════════════ -->
+<rect x="541" y="441" width="118" height="100" rx="4" class="tank-body"/>
+<rect id="liq-r2" x="542" y="510" width="116" height="30"
+      clip-path="url(#r2Clip)" fill="url(#liqG2)"/>
+<polyline points="541,444 600,425 659,444" class="tank-cap"/>
+<text x="600" y="478" text-anchor="middle" class="sec-lbl-main" font-size="12">R-2</text>
+<text x="600" y="492" text-anchor="middle" class="sec-lbl">Reactor 2</text>
+<!-- Füllstand Reactor 2 -->
+<text id="r2-pct" x="600" y="530" text-anchor="middle" class="instr-val" font-size="10">0 %</text>
+<!-- Alarm icon R2 -->
+<text id="alm-r2" x="600" y="462" text-anchor="middle" font-size="16" class="alm">⚠</text>
+
+<!-- Sel Target Raute (Mitte unten) -->
+<polygon points="300,510 320,498 340,510 320,522" class="diamond"/>
+<text x="320" y="507" text-anchor="middle" class="diamond-txt">Sel</text>
+<text x="320" y="518" text-anchor="middle" class="diamond-txt">Target</text>
+
+<!-- Alarm Tank -->
+<text id="alm-tank" x="320" y="60" text-anchor="middle" font-size="18" class="alm" filter="url(#glow)">⚠</text>
+
+</svg>
+</div><!-- /canvas-area -->
+
+<!-- ══════════════ RECHTES PANEL ══════════════ -->
+<div class="rpanel">
+
+  <!-- Messwerte -->
+  <div class="rblock">
+    <div class="rtitle">📊 Messwerte</div>
+
+    <div class="mrow">
+      <span class="ml">LI-111 Füllstand Tank</span>
+      <span><span class="mv" id="pv-li111">0.0</span><span class="mu">%</span></span>
+    </div>
+    <div class="bar-bg"><div class="bar" id="bar-li111" style="width:0%"></div></div>
+
+    <div class="mrow" style="margin-top:6px;">
+      <span class="ml">FC-111 Durchfluss</span>
+      <span><span class="mv" id="pv-fc111">0.0</span><span class="mu">m³/h</span></span>
+    </div>
+
+    <div class="mrow">
+      <span class="ml">Füllstand Reactor 1</span>
+      <span><span class="mv" id="pv-r1">0.0</span><span class="mu">%</span></span>
+    </div>
+    <div class="bar-bg"><div class="bar" id="bar-r1" style="width:0%"></div></div>
+
+    <div class="mrow" style="margin-top:6px;">
+      <span class="ml">Füllstand Reactor 2</span>
+      <span><span class="mv" id="pv-r2">0.0</span><span class="mu">%</span></span>
+    </div>
+    <div class="bar-bg"><div class="bar" id="bar-r2" style="width:0%"></div></div>
+
+    <div class="mrow" style="margin-top:6px;">
+      <span class="ml">NP 111a Status</span>
+      <span class="mv" id="pv-np1" style="color:var(--gray)">AUS</span>
+    </div>
+    <div class="mrow">
+      <span class="ml">NP 111b Status</span>
+      <span class="mv" id="pv-np2" style="color:var(--gray)">AUS</span>
+    </div>
+  </div>
+
+  <!-- Ziel-Selektor -->
+  <div class="rblock">
+    <div class="rtitle">🎯 Sel Target – Zielreaktor</div>
+    <div class="sel-row">
+      <div class="sel-btn active" id="sel-r1" onclick="setTarget(1)">▶ Reactor 1</div>
+      <div class="sel-btn" id="sel-r2" onclick="setTarget(2)">▶ Reactor 2</div>
+      <div class="sel-btn" id="sel-both" onclick="setTarget(3)">▶ BEIDE</div>
+    </div>
+    <div style="text-align:center;font-size:9px;color:var(--dim);margin-top:3px;" id="sel-info">Ziel: Reactor 1</div>
+  </div>
+
+  <!-- Set Vol Setpoint -->
+  <div class="rblock">
+    <div class="rtitle">⚙ Set Vol – Sollwert</div>
+    <div class="sp-row">
+      <span class="sp-lbl">Sollvolumen</span>
+      <input type="range" id="sp-vol" min="10" max="100" value="60" oninput="updateSP()"/>
+      <span class="sp-val" id="sp-val">60 %</span>
+    </div>
+    <div style="font-size:9px;color:var(--dim);text-align:center;">
+      Stopp-Grenzwert für Zielreaktor
+    </div>
+  </div>
+
+  <!-- Grenzwerte -->
+  <div class="rblock">
+    <div class="rtitle">⚠ Grenzwerte</div>
+    <div class="mrow"><span class="ml">HH Tank (Alarm)</span><span class="mv" style="color:var(--red)">90 %</span></div>
+    <div class="mrow"><span class="ml">H Tank (Warn)</span><span class="mv" style="color:var(--orange)">80 %</span></div>
+    <div class="mrow"><span class="ml">Reactor Voll</span><span class="mv" style="color:var(--orange)" id="sp-lim">60 %</span></div>
+  </div>
+
+  <!-- Steuerung -->
+  <div class="rblock">
+    <div class="rtitle">🎛 Steuerung</div>
+    <div class="btn-row">
+      <button class="btn btn-start" id="btn-start" onclick="startSim()">▶ START</button>
+      <button class="btn btn-stop"  onclick="stopSim()">■ STOP</button>
+      <button class="btn btn-reset" onclick="resetSim()">↺ RESET</button>
+    </div>
+    <div style="margin-top:6px;text-align:center;font-size:9px;color:var(--dim);">
+      Modus: <span id="mode-txt" style="color:var(--accent);">HAND / LOKAL</span>
+    </div>
+  </div>
+
+  <!-- Laufzeit -->
+  <div class="rblock">
+    <div class="rtitle">⏱ Laufzeit NP 111</div>
+    <div class="rt" id="rt">00:00:00</div>
+  </div>
+
+  <!-- Alarmliste -->
+  <div class="rblock" style="flex:1;">
+    <div class="rtitle">🚨 Alarmliste</div>
+    <div class="alm-list" id="alm-list">
+      <div class="no-alm" id="no-alm">Keine aktiven Alarme</div>
+    </div>
+  </div>
+
+</div><!-- /rpanel -->
+</div><!-- /main -->
+
+<script>
+// ════════════════════════════════════════════════════════════
+// State
+// ════════════════════════════════════════════════════════════
+const S = {
+  running: false,
+  tankLvl: 85.0,   // %  (Rohstofftank startet voll)
+  r1Lvl:   0.0,
+  r2Lvl:   0.0,
+  fc111:   0.0,
+  target:  1,       // 1=R1, 2=R2, 3=beide
+  setVol:  60,      // %
+  rtSec:   0,
+  alarms:  [],
+  // alarm flags
+  almTankHH: false,
+  almTankH:  false,
+  almR1full: false,
+  almR2full: false,
+};
+
+// ════════════════════════════════════════════════════════════
+// Uhr
+// ════════════════════════════════════════════════════════════
+function tick(){
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('de-DE',{hour12:false});
+}
+setInterval(tick,1000); tick();
+
+// ════════════════════════════════════════════════════════════
+// Hilfsfunktionen
+// ════════════════════════════════════════════════════════════
+function setFlow(ids, on){
+  ids.forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){ on?el.classList.add('on'):el.classList.remove('on'); }
+  });
+}
+
+function setValve(prefix, open){
+  ['t1','t2'].forEach(s=>{
+    const el=document.getElementById(prefix+'-'+s);
+    if(!el) return;
+    if(open){ el.classList.remove('v-closed'); el.classList.add('v-open'); }
+    else     { el.classList.remove('v-open');   el.classList.add('v-closed'); }
+  });
+  // Trennlinie Farbe
+  const parent=document.getElementById(prefix);
+  if(parent){
+    const line=parent.querySelector('line');
+    if(line) line.setAttribute('stroke', open?'var(--green)':'var(--red)');
+  }
+}
+
+function setPump(id, blade_id, on){
+  const b=document.getElementById(blade_id);
+  if(b) b.style.animation = on ? 'spin .7s linear infinite' : 'none';
+  const dot = id==='A'?'d-np1':'d-np2';
+  const pvId= id==='A'?'pv-np1':'pv-np2';
+  document.getElementById(dot).className = on?'dot g':'dot';
+  const el=document.getElementById(pvId);
+  el.textContent = on?'EIN':'AUS';
+  el.style.color  = on?'var(--green)':'var(--gray)';
+}
+
+function addAlarm(tag, msg, type='r'){
+  const t=new Date().toLocaleTimeString('de-DE',{hour12:false});
+  S.alarms.unshift({t,tag,msg,type});
+  renderAlarms();
+}
+
+function renderAlarms(){
+  const list=document.getElementById('alm-list');
+  const noalm=document.getElementById('no-alm');
+  list.innerHTML='';
+  if(S.alarms.length===0){ list.appendChild(noalm); noalm.style.display='block'; return; }
+  noalm.style.display='none';
+  S.alarms.slice(0,20).forEach(a=>{
+    const d=document.createElement('div');
+    d.className='ae';
+    d.innerHTML=`<span class="at">${a.t}</span><span class="ag ${a.type}">${a.tag}</span><span class="am">${a.msg}</span>`;
+    list.appendChild(d);
+  });
+}
+
+function setAlarmStatus(on){
+  const dot=document.getElementById('d-alm');
+  const txt=document.getElementById('alm-txt');
+  dot.className = on?'dot r':'dot g';
+  txt.textContent = on?'⚠ ALARM':'KEIN ALARM';
+  txt.style.color  = on?'var(--red)':'';
+}
+
+function fmtRt(s){
+  return [Math.floor(s/3600),Math.floor(s%3600/60),s%60]
+    .map(v=>String(v).padStart(2,'0')).join(':');
+}
+
+// ════════════════════════════════════════════════════════════
+// Tank-Visualisierung
+// ════════════════════════════════════════════════════════════
+function updateTankVis(id, clipId, lvl, maxH, tankTopY, tankBotY){
+  const el=document.getElementById(id);
+  if(!el) return;
+  const h=Math.max(0,(lvl/100)*maxH);
+  const y=tankBotY-h;
+  el.setAttribute('y',y);
+  el.setAttribute('height',h);
+  el.setAttribute('fill', lvl>=90?'rgba(255,23,68,.65)':lvl>=80?'rgba(255,109,0,.55)':'url(#liqG)');
+}
+
+function updateRVis(id, lvl, maxH, topY, botY, fillId){
+  const el=document.getElementById(id);
+  if(!el) return;
+  const h=Math.max(0,(lvl/100)*maxH);
+  const y=botY-h;
+  el.setAttribute('y',y);
+  el.setAttribute('height',h);
+  el.setAttribute('fill', lvl>=S.setVol?'rgba(255,109,0,.55)':'url(#liqG2)');
+  const pct=document.getElementById(fillId);
+  if(pct) pct.textContent=lvl.toFixed(1)+' %';
+}
+
+// Schwimmer-Animation
+function updateFloat(lvl){
+  const dot=document.getElementById('float-dot');
+  if(!dot) return;
+  // y: bei 100% → ca. 45, bei 0% → ca. 165
+  const y = 165 - (lvl/100)*120;
+  dot.setAttribute('cy', y);
+}
+
+// ════════════════════════════════════════════════════════════
+// Panel-Update
+// ════════════════════════════════════════════════════════════
+function updatePanel(){
+  // LI 111
+  const li=S.tankLvl.toFixed(1);
+  document.getElementById('pv-li111').textContent=li;
+  document.getElementById('li111-val').textContent=li;
+  const barL=document.getElementById('bar-li111');
+  barL.style.width=li+'%';
+  barL.className='bar'+(S.tankLvl>=90?' a':S.tankLvl>=80?' w':'');
+  const pvLi=document.getElementById('pv-li111');
+  pvLi.className='mv'+(S.tankLvl>=80?' alarm':'');
+
+  // FC 111
+  document.getElementById('pv-fc111').textContent=S.fc111.toFixed(1);
+  document.getElementById('fc111-val').textContent=S.fc111.toFixed(1);
+
+  // R1
+  const r1=S.r1Lvl.toFixed(1);
+  document.getElementById('pv-r1').textContent=r1;
+  const br1=document.getElementById('bar-r1');
+  br1.style.width=r1+'%';
+  br1.className='bar'+(S.r1Lvl>=S.setVol?' w':'');
+
+  // R2
+  const r2=S.r2Lvl.toFixed(1);
+  document.getElementById('pv-r2').textContent=r2;
+  const br2=document.getElementById('bar-r2');
+  br2.style.width=r2+'%';
+  br2.className='bar'+(S.r2Lvl>=S.setVol?' w':'');
+
+  // Runtime
+  document.getElementById('rt').textContent=fmtRt(S.rtSec);
+}
+
+// ════════════════════════════════════════════════════════════
+// Sel Target
+// ════════════════════════════════════════════════════════════
+function setTarget(t){
+  S.target=t;
+  ['sel-r1','sel-r2','sel-both'].forEach((id,i)=>{
+    document.getElementById(id).classList.toggle('active', i+1===t);
+  });
+  const names=['Reactor 1','Reactor 2','R1 & R2 (beide)'];
+  document.getElementById('sel-info').textContent='Ziel: '+names[t-1];
+}
+
+function updateSP(){
+  S.setVol=parseInt(document.getElementById('sp-vol').value);
+  document.getElementById('sp-val').textContent=S.setVol+' %';
+  document.getElementById('sp-lim').textContent=S.setVol+' %';
+}
+
+// ════════════════════════════════════════════════════════════
+// Alarm-Logik
+// ════════════════════════════════════════════════════════════
+function checkAlarms(){
+  let anyAlm=false;
+
+  // Tank HH
+  if(S.tankLvl>=90 && !S.almTankHH){
+    S.almTankHH=true; anyAlm=true;
+    addAlarm('LI-111','Füllstand Tank HH ≥ 90% – ALARM!','r');
+    document.getElementById('alm-tank').classList.add('blink');
+  }
+  // Tank H (Vorwarnung)
+  if(S.tankLvl>=80 && !S.almTankH){
+    S.almTankH=true;
+    addAlarm('LI-111','Füllstand Tank H ≥ 80% – Vorwarnung','y');
+  }
+  // Tank leer
+  if(S.tankLvl<=2 && S.running){
+    addAlarm('LI-111','Rohstofftank leer – Pumpen stoppen!','r');
+    stopSim(true);
+    return;
+  }
+
+  // R1 voll
+  if(S.r1Lvl>=S.setVol && !S.almR1full && (S.target===1||S.target===3)){
+    S.almR1full=true; anyAlm=true;
+    addAlarm('NK-113','Reactor 1 erreicht Sollvolumen '+S.setVol+'%','y');
+    document.getElementById('alm-r1').classList.add('blink');
+    // NK113 schließen
+    setValve('vNK113',false);
+    setFlow(['f-nk113-a','f-nk113-b'],false);
+    if(S.target===1) stopSim(true);
+  }
+
+  // R2 voll
+  if(S.r2Lvl>=S.setVol && !S.almR2full && (S.target===2||S.target===3)){
+    S.almR2full=true; anyAlm=true;
+    addAlarm('NK-114','Reactor 2 erreicht Sollvolumen '+S.setVol+'%','y');
+    document.getElementById('alm-r2').classList.add('blink');
+    setValve('vNK114',false);
+    setFlow(['f-nk114-a','f-nk114-b'],false);
+    if(S.target===2) stopSim(true);
+  }
+
+  // Beide voll bei target=3
+  if(S.target===3 && S.almR1full && S.almR2full && S.running){
+    addAlarm('SYS','Beide Reaktoren voll – Anlage stoppt','b');
+    stopSim(true);
+  }
+
+  if(anyAlm) setAlarmStatus(true);
+}
+
+// ════════════════════════════════════════════════════════════
+// Simulation Tick
+// ════════════════════════════════════════════════════════════
+let simInterval=null;
+
+function simTick(){
+  if(!S.running) return;
+  S.rtSec++;
+
+  // Durchfluss je nach aktivem Zweig
+  const r1Active=(S.target===1||S.target===3)&&S.r1Lvl<S.setVol;
+  const r2Active=(S.target===2||S.target===3)&&S.r2Lvl<S.setVol;
+  const numActive=(r1Active?1:0)+(r2Active?1:0);
+
+  const totalFlow = numActive>0 ? (15.0 + (Math.random()-.5)*1.5) : 0;
+  const flowPer   = numActive>0 ? totalFlow/numActive : 0;
+
+  S.fc111 = totalFlow;
+
+  // Tank entleert sich
+  const drainRate = totalFlow>0 ? totalFlow*0.004 : 0;
+  S.tankLvl = Math.max(0, S.tankLvl - drainRate);
+
+  // Reaktoren füllen
+  if(r1Active) S.r1Lvl = Math.min(100, S.r1Lvl + flowPer*0.006 + Math.random()*.05);
+  if(r2Active) S.r2Lvl = Math.min(100, S.r2Lvl + flowPer*0.006 + Math.random()*.05);
+
+  // Visualisierung
+  updateTankVis('liq-tank','tankClip',S.tankLvl,130,41,171);
+  updateRVis('liq-r1',S.r1Lvl,99,441,540,'r1-pct');
+  updateRVis('liq-r2',S.r2Lvl,99,441,540,'r2-pct');
+  updateFloat(S.tankLvl);
+
+  // Flows
+  setFlow(['f-tank-nk111','f-nk111-pump','f-pump-h'],true);
+  setFlow(['f-np1-a','f-np1-b'],true);
+  setFlow(['f-np2-a','f-np2-b'],true);
+  setFlow(['f-to-nk112','f-nk112-h1','f-nk112-h2'],numActive>0);
+
+  if(r1Active && !S.almR1full) setFlow(['f-nk113-a','f-nk113-b'],true);
+  if(r2Active && !S.almR2full) setFlow(['f-nk114-a','f-nk114-b'],true);
+
+  checkAlarms();
+  updatePanel();
+}
+
+// ════════════════════════════════════════════════════════════
+// START
+// ════════════════════════════════════════════════════════════
+function startSim(){
+  if(S.running) return;
+  S.running=true;
+
+  // Alle relevanten Ventile öffnen
+  setValve('vNK111',true);
+  setValve('vNK112',true);
+  if(S.target===1||S.target===3) setValve('vNK113',true);
+  if(S.target===2||S.target===3) setValve('vNK114',true);
+
+  // Pumpen starten
+  setPump('A','pumpA-blade',true);
+  setPump('B','pumpB-blade',true);
+
+  document.getElementById('btn-start').classList.add('act');
+  document.getElementById('mode-txt').textContent='AUTO / FERN';
+
+  addAlarm('SYS','Dosierung gestartet – Ziel: '+(S.target===1?'Reactor 1':S.target===2?'Reactor 2':'Beide'),'b');
+
+  simInterval=setInterval(simTick,600);
+}
+
+// ════════════════════════════════════════════════════════════
+// STOP
+// ════════════════════════════════════════════════════════════
+function stopSim(auto=false){
+  S.running=false;
+  clearInterval(simInterval);
+
+  setValve('vNK111',false);
+  setValve('vNK112',false);
+  setValve('vNK113',false);
+  setValve('vNK114',false);
+
+  setPump('A','pumpA-blade',false);
+  setPump('B','pumpB-blade',false);
+
+  setFlow([
+    'f-tank-nk111','f-nk111-pump','f-pump-h',
+    'f-np1-a','f-np1-b','f-np2-a','f-np2-b',
+    'f-to-nk112','f-nk112-h1','f-nk112-h2',
+    'f-nk113-a','f-nk113-b','f-nk114-a','f-nk114-b'
+  ],false);
+
+  S.fc111=0;
+  document.getElementById('btn-start').classList.remove('act');
+  document.getElementById('mode-txt').textContent=auto?'AUTO-STOP':'HAND / LOKAL';
+  if(!auto) addAlarm('SYS','Anlage manuell gestoppt','b');
+  updatePanel();
+}
+
+// ════════════════════════════════════════════════════════════
+// RESET
+// ════════════════════════════════════════════════════════════
+function resetSim(){
+  stopSim();
+  S.tankLvl=85; S.r1Lvl=0; S.r2Lvl=0; S.fc111=0;
+  S.rtSec=0; S.alarms=[];
+  S.almTankHH=false; S.almTankH=false;
+  S.almR1full=false; S.almR2full=false;
+
+  updateTankVis('liq-tank','tankClip',S.tankLvl,130,41,171);
+  updateRVis('liq-r1',0,99,441,540,'r1-pct');
+  updateRVis('liq-r2',0,99,441,540,'r2-pct');
+  updateFloat(S.tankLvl);
+  updatePanel();
+  setAlarmStatus(false);
+  renderAlarms();
+
+  ['alm-tank','alm-r1','alm-r2'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){el.classList.remove('blink');el.style.opacity='0';}
+  });
+
+  document.getElementById('li111-val').textContent=S.tankLvl.toFixed(1);
+  document.getElementById('fc111-val').textContent='--.-';
+  document.getElementById('mode-txt').textContent='HAND / LOKAL';
+  addAlarm('SYS','System-Reset – Quittierung OK','b');
+  renderAlarms();
+}
+
+// Init
+updateTankVis('liq-tank','tankClip',S.tankLvl,130,41,171);
+updateFloat(S.tankLvl);
+updatePanel();
+renderAlarms();
+document.getElementById('li111-val').textContent=S.tankLvl.toFixed(1);
+</script>
+</body>
+</html>
