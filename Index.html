@@ -3,915 +3,947 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SIMATIC PCS 7 – R&I Simulation | Raw Material Tank → Reactor 1/2</title>
+<title>SIMATIC PCS 7 | WinCC OS | Reaktor R101</title>
 <style>
-:root {
-  --bg:      #1a1f2e;
-  --panel:   #16213e;
-  --border:  #2a4a7f;
-  --accent:  #00d4ff;
-  --green:   #00e676;
-  --yellow:  #ffea00;
-  --red:     #ff1744;
-  --orange:  #ff6d00;
-  --gray:    #546e7a;
-  --text:    #e0e0e0;
-  --dim:     #78909c;
-  --pipe:    #607d8b;
-  --pipeflow:#00d4ff;
+/* ══════════════════════════════════════════════
+   WinCC Professional – Exaktes Farbschema
+══════════════════════════════════════════════ */
+:root{
+  --wincc-bg:      #d4d0c8;
+  --wincc-panel:   #c0bcb4;
+  --wincc-border:  #888880;
+  --wincc-header:  #006487;
+  --wincc-blue:    #0070a8;
+  --wincc-dark:    #2c2c2c;
+  --io-bg:         #000000;
+  --io-green:      #00ff41;
+  --io-yellow:     #ffff00;
+  --io-red:        #ff2020;
+  --io-cyan:       #00ffff;
+  --btn-green:     #007a35;
+  --btn-yellow:    #c8800a;
+  --btn-red:       #a01010;
+  --btn-gray:      #606060;
+  --led-on-g:      #00e800;
+  --led-on-r:      #ff0000;
+  --led-on-y:      #ffcc00;
+  --led-off:       #2a2a2a;
+  --pipe-c:        #808080;
+  --alarm-bg:      #1a1a1a;
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 body{
-  background:var(--bg);
-  font-family:'Courier New',monospace;
-  color:var(--text);
+  background:var(--wincc-bg);
+  font-family:'Courier New',Courier,monospace;
+  font-size:12px;
+  color:#000;
   height:100vh;
   display:flex;
   flex-direction:column;
   overflow:hidden;
 }
 
-/* ── Titelleiste ──────────────────────────────────────────────── */
-.titlebar{
-  background:linear-gradient(90deg,#0d1b2a,#1a3a5c,#0d1b2a);
-  border-bottom:2px solid var(--accent);
+/* ── HEADER ───────────────────────────────── */
+.header{
+  background:var(--wincc-header);
+  color:#fff;
   padding:6px 16px;
-  display:flex;align-items:center;justify-content:space-between;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  border-bottom:3px solid #004060;
+  flex-shrink:0;
 }
-.logo{font-size:18px;font-weight:900;letter-spacing:3px;color:var(--accent);text-shadow:0 0 10px var(--accent);}
-.title-center{font-size:11px;color:var(--dim);letter-spacing:1px;}
-.title-center span{color:var(--text);font-weight:bold;}
-.clock{font-size:12px;color:var(--accent);background:rgba(0,212,255,0.08);border:1px solid var(--border);padding:3px 10px;border-radius:3px;letter-spacing:2px;}
-
-/* ── Statusleiste ─────────────────────────────────────────────── */
-.statusbar{
-  background:var(--panel);border-bottom:1px solid var(--border);
-  padding:4px 16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+.header-left{display:flex;align-items:center;gap:14px;}
+.siemens-logo{
+  font-size:20px;font-weight:900;letter-spacing:4px;
+  color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.5);
 }
-.si{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--dim);}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--gray);transition:all .3s;}
-.dot.g{background:var(--green);box-shadow:0 0 6px var(--green);}
-.dot.r{background:var(--red);box-shadow:0 0 6px var(--red);}
-.dot.y{background:var(--yellow);box-shadow:0 0 6px var(--yellow);}
-.dot.b{background:var(--accent);box-shadow:0 0 6px var(--accent);}
-
-/* ── Layout ───────────────────────────────────────────────────── */
-.main{display:grid;grid-template-columns:1fr 270px;flex:1;overflow:hidden;}
-.canvas-area{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;}
-.canvas-area::before{
-  content:'';position:absolute;inset:0;
-  background-image:linear-gradient(rgba(0,212,255,0.03) 1px,transparent 1px),
-                   linear-gradient(90deg,rgba(0,212,255,0.03) 1px,transparent 1px);
-  background-size:30px 30px;pointer-events:none;
+.header-title{font-size:13px;letter-spacing:1px;}
+.header-title span{font-weight:bold;color:#80d0f0;}
+.header-right{display:flex;align-items:center;gap:16px;}
+.clock-box{
+  background:#003c55;border:1px solid #007ab0;
+  padding:3px 12px;font-size:14px;letter-spacing:2px;color:#80d0f0;
 }
-svg#ri{width:100%;max-width:720px;height:auto;}
-
-/* ── SVG Styles ───────────────────────────────────────────────── */
-.pipe{stroke:var(--pipe);stroke-width:6;fill:none;stroke-linecap:round;stroke-linejoin:round;}
-.pipe-dash{stroke:var(--dim);stroke-width:2;fill:none;stroke-dasharray:6 4;stroke-linecap:round;}
-.flow{stroke:var(--pipeflow);stroke-width:3.5;fill:none;stroke-dasharray:10 14;stroke-linecap:round;opacity:0;transition:opacity .4s;}
-.flow.on{opacity:1;animation:flowA 1s linear infinite;}
-.flow.rev{animation:flowR 1s linear infinite;opacity:0;}
-.flow.rev.on{opacity:1;}
-@keyframes flowA{to{stroke-dashoffset:-24;}}
-@keyframes flowR{to{stroke-dashoffset:24;}}
-
-/* Tanks */
-.tank-body{fill:#0d2137;stroke:var(--accent);stroke-width:2.5;}
-.tank-liq{transition:height .5s ease,y .5s ease;}
-.tank-cap{fill:none;stroke:var(--accent);stroke-width:2.5;}
-
-/* Pumpe */
-.pump-ring{fill:#0f2a42;stroke:var(--accent);stroke-width:2;}
-.pump-arrow{fill:none;stroke:var(--accent);stroke-width:2.2;stroke-linecap:round;}
-.pump-spin{animation:spin .7s linear infinite;transform-box:fill-box;transform-origin:center;}
-@keyframes spin{to{transform:rotate(360deg);}}
-
-/* Ventile */
-.valve-tri{stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;transition:stroke .3s,fill .3s;}
-.v-closed{stroke:var(--red);fill:rgba(255,23,68,.15);}
-.v-open{stroke:var(--green);fill:rgba(0,230,118,.15);}
-
-/* Labels/Instrumente (Oval) */
-.instr-ell{fill:#0d2137;stroke:var(--accent);stroke-width:1.5;}
-.instr-txt{fill:var(--accent);font-family:'Courier New',monospace;font-size:9px;font-weight:bold;}
-.instr-val{fill:var(--yellow);font-family:'Courier New',monospace;font-size:10px;font-weight:bold;}
-
-/* Setpoint Raute */
-.diamond{fill:#0d2137;stroke:var(--accent);stroke-width:1.5;}
-.diamond-txt{fill:var(--accent);font-size:9px;font-family:'Courier New',monospace;}
-
-/* Section labels */
-.sec-lbl{fill:var(--dim);font-size:11px;font-family:'Courier New',monospace;letter-spacing:.5px;}
-.sec-lbl-main{fill:var(--text);font-size:13px;font-weight:bold;font-family:'Courier New',monospace;}
-
-/* Alarm blink */
-.alm{fill:var(--red);opacity:0;}
-.alm.blink{animation:blk .45s step-start infinite;}
-@keyframes blk{50%{opacity:0;}0%,100%{opacity:1;}}
-
-/* ── Rechtes Panel ────────────────────────────────────────────── */
-.rpanel{
-  background:var(--panel);border-left:2px solid var(--border);
-  display:flex;flex-direction:column;overflow-y:auto;
+.mode-box{
+  background:#002030;border:1px solid #007ab0;
+  padding:3px 12px;font-size:12px;color:#fff;letter-spacing:1px;
 }
-.rblock{border-bottom:1px solid var(--border);padding:10px 14px;}
-.rtitle{font-size:9px;letter-spacing:2px;color:var(--accent);text-transform:uppercase;margin-bottom:8px;border-bottom:1px solid rgba(0,212,255,.2);padding-bottom:4px;}
 
-/* Messwerte */
-.mrow{display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);}
-.ml{font-size:10px;color:var(--dim);}
-.mv{font-size:13px;font-weight:bold;color:var(--yellow);min-width:65px;text-align:right;}
-.mu{font-size:9px;color:var(--dim);margin-left:3px;}
-.mv.alarm{color:var(--red);animation:blk .45s step-start infinite;}
-.bar-bg{height:5px;background:rgba(255,255,255,.07);border-radius:3px;margin-top:3px;overflow:hidden;}
-.bar{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--green),var(--accent));transition:width .5s ease;}
-.bar.w{background:linear-gradient(90deg,var(--yellow),var(--orange));}
-.bar.a{background:linear-gradient(90deg,var(--orange),var(--red));}
-
-/* Ziel-Selector */
-.sel-row{display:flex;gap:6px;margin:6px 0;}
-.sel-btn{
-  flex:1;padding:7px 4px;border:1.5px solid var(--border);border-radius:3px;
-  background:rgba(0,212,255,.06);color:var(--dim);font-family:'Courier New',monospace;
-  font-size:10px;cursor:pointer;transition:all .2s;text-align:center;
+/* ── STEP BAR ─────────────────────────────── */
+.stepbar{
+  background:#2a2a2a;border-bottom:2px solid #444;
+  padding:4px 12px;display:flex;align-items:center;gap:6px;flex-shrink:0;
 }
-.sel-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(0,212,255,.18);box-shadow:0 0 8px rgba(0,212,255,.4);}
-.sel-btn:hover{border-color:var(--accent);color:var(--text);}
+.step-item{
+  padding:3px 10px;border:1px solid #555;border-radius:2px;
+  font-size:10px;color:#888;background:#1a1a1a;white-space:nowrap;
+  transition:all .3s;
+}
+.step-item.active{
+  background:#004080;border-color:#0080c0;
+  color:#80d0ff;font-weight:bold;
+  box-shadow:0 0 8px rgba(0,128,192,.6);
+}
+.step-item.done{background:#003020;border-color:#006040;color:#40c080;}
+.step-lbl{color:#888;font-size:10px;margin-right:4px;white-space:nowrap;}
 
-/* Setpoint Slider */
-.sp-row{display:flex;align-items:center;gap:8px;margin:6px 0;}
-.sp-lbl{font-size:10px;color:var(--dim);min-width:60px;}
-.sp-val{font-size:13px;font-weight:bold;color:var(--yellow);min-width:45px;text-align:right;}
+/* ── MAIN BUTTONS ─────────────────────────── */
+.btn-bar{
+  background:var(--wincc-panel);
+  border-bottom:2px solid var(--wincc-border);
+  padding:6px 16px;display:flex;gap:10px;flex-shrink:0;
+}
+.main-btn{
+  padding:8px 24px;font-family:'Courier New',monospace;
+  font-size:12px;font-weight:bold;letter-spacing:1px;
+  border:2px outset;cursor:pointer;text-transform:uppercase;
+  transition:all .1s;min-width:110px;
+}
+.main-btn:active{border-style:inset;transform:translate(1px,1px);}
+.btn-auto{background:#007a35;border-color:#00b050 #004020 #004020 #00b050;color:#fff;}
+.btn-auto:hover{background:#009040;}
+.btn-auto.active-mode{background:#00b050;box-shadow:inset 0 0 8px rgba(0,0,0,.5);border-style:inset;}
+.btn-hand{background:#c8800a;border-color:#f0a030 #704000 #704000 #f0a030;color:#fff;}
+.btn-hand:hover{background:#e09020;}
+.btn-hand.active-mode{background:#f0a030;box-shadow:inset 0 0 8px rgba(0,0,0,.5);border-style:inset;}
+.btn-stop{background:#a01010;border-color:#d03030 #500000 #500000 #d03030;color:#fff;}
+.btn-stop:hover{background:#c01818;}
+.btn-stop.active-mode{background:#d03030;box-shadow:inset 0 0 8px rgba(0,0,0,.5);border-style:inset;}
+
+.btn-bar-right{margin-left:auto;display:flex;gap:8px;align-items:center;}
+.ack-btn{
+  padding:6px 16px;background:#404040;border:2px outset #666;
+  color:#ffcc00;font-family:'Courier New',monospace;font-size:11px;
+  cursor:pointer;letter-spacing:1px;
+}
+.ack-btn:hover{background:#505050;}
+.ack-btn:active{border-style:inset;}
+
+/* ── MAIN LAYOUT ──────────────────────────── */
+.main{display:flex;flex:1;overflow:hidden;gap:0;}
+.left-col{flex:2;display:flex;flex-direction:column;overflow:hidden;padding:6px 6px 6px 8px;gap:6px;}
+.right-col{flex:1;display:flex;flex-direction:column;overflow:hidden;padding:6px 8px 6px 4px;gap:6px;min-width:280px;max-width:320px;}
+
+/* ── PANELS ───────────────────────────────── */
+.panel{
+  background:var(--wincc-panel);
+  border:2px inset var(--wincc-border);
+  padding:6px;
+}
+.panel-title{
+  background:var(--wincc-header);color:#fff;
+  font-size:10px;letter-spacing:1px;padding:2px 8px;
+  margin-bottom:6px;text-transform:uppercase;
+}
+
+/* ── I/O FELDER ───────────────────────────── */
+.io-grid{display:flex;gap:6px;flex-wrap:wrap;}
+.io-field{
+  background:var(--io-bg);
+  border:2px inset #555;
+  padding:4px 8px;
+  min-width:140px;flex:1;
+}
+.io-label{color:#80a0c0;font-size:9px;letter-spacing:1px;margin-bottom:2px;}
+.io-value{
+  color:var(--io-green);font-size:18px;font-weight:bold;
+  letter-spacing:2px;text-align:right;
+}
+.io-value.warn{color:var(--io-yellow);}
+.io-value.alarm{color:var(--io-red);animation:blink-io .4s step-start infinite;}
+.io-unit{color:#606060;font-size:10px;margin-left:4px;}
+@keyframes blink-io{50%{opacity:0;}}
+
+/* ── SVG AREA ─────────────────────────────── */
+.svg-wrap{
+  flex:1;
+  background:#e8e4dc;
+  border:2px inset var(--wincc-border);
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;min-height:0;
+}
+svg#ri{width:100%;height:100%;max-height:400px;}
+
+/* ── ALARM LOG ────────────────────────────── */
+.alarm-box{
+  background:var(--alarm-bg);
+  border:2px inset #555;
+  flex:1;overflow-y:auto;min-height:0;
+  padding:4px;
+}
+.alarm-row{
+  display:flex;gap:6px;align-items:flex-start;
+  padding:2px 4px;border-bottom:1px solid #2a2a2a;
+  font-size:10px;
+}
+.alarm-row.info .a-icon{color:#40a0ff;}
+.alarm-row.warn .a-icon{color:#ffcc00;}
+.alarm-row.crit .a-icon{color:#ff4040;animation:blink-io .5s step-start infinite;}
+.a-time{color:#606060;min-width:50px;white-space:nowrap;}
+.a-msg{color:#c0c0c0;flex:1;}
+.a-icon{font-size:12px;min-width:18px;text-align:center;}
+.no-alarm{color:#404040;text-align:center;padding:10px;font-size:11px;}
+
+/* ── HAND PANEL ───────────────────────────── */
+.hand-panel{background:var(--wincc-panel);border:2px inset var(--wincc-border);padding:6px;}
+.hand-title{background:#704000;color:#fff;font-size:10px;padding:2px 8px;margin-bottom:6px;letter-spacing:1px;}
+.switch-grid{display:flex;flex-direction:column;gap:4px;}
+.sw-row{display:flex;align-items:center;justify-content:space-between;gap:6px;}
+.sw-lbl{font-size:10px;color:#333;min-width:90px;}
+.sw-btn{
+  padding:3px 12px;border:2px outset #888;font-family:'Courier New',monospace;
+  font-size:10px;cursor:pointer;background:#404040;color:#80c080;
+  transition:all .1s;
+}
+.sw-btn:active{border-style:inset;}
+.sw-btn.sw-on{background:#006000;border-color:#00c000 #003000 #003000 #00c000;color:#80ff80;}
+.sw-btn.sw-off{background:#400000;border-color:#c00000 #200000 #200000 #c00000;color:#ff8080;}
+.sw-btn:disabled{opacity:.4;cursor:not-allowed;}
+
+.led{
+  width:14px;height:14px;border-radius:50%;
+  border:1px solid #222;display:inline-block;flex-shrink:0;
+  transition:background .2s,box-shadow .2s;
+}
+.led.on-g{background:var(--led-on-g);box-shadow:0 0 6px var(--led-on-g);}
+.led.on-r{background:var(--led-on-r);box-shadow:0 0 6px var(--led-on-r);}
+.led.on-y{background:var(--led-on-y);box-shadow:0 0 6px var(--led-on-y);}
+.led.off{background:var(--led-off);}
+
+.slider-row{margin-top:6px;}
+.slider-lbl{font-size:10px;color:#333;margin-bottom:2px;}
 input[type=range]{
-  flex:1;-webkit-appearance:none;height:4px;background:var(--border);border-radius:2px;outline:none;
+  width:100%;-webkit-appearance:none;height:6px;
+  background:#888;border-radius:3px;outline:none;
 }
 input[type=range]::-webkit-slider-thumb{
-  -webkit-appearance:none;width:14px;height:14px;border-radius:50%;
-  background:var(--accent);box-shadow:0 0 6px var(--accent);cursor:pointer;
+  -webkit-appearance:none;width:16px;height:16px;
+  border-radius:50%;background:#0070a8;cursor:pointer;
+  border:2px solid #004060;
 }
+input[type=range]:disabled{opacity:.4;}
 
-/* Steuerbuttons */
-.btn-row{display:flex;gap:6px;}
-.btn{
-  flex:1;padding:10px 4px;border:2px solid;border-radius:3px;
-  font-family:'Courier New',monospace;font-size:11px;font-weight:bold;
-  letter-spacing:1px;cursor:pointer;text-transform:uppercase;transition:all .2s;
-}
-.btn:hover{filter:brightness(1.3);}
-.btn:active{transform:scale(.96);}
-.btn-start{background:rgba(0,230,118,.1);border-color:var(--green);color:var(--green);}
-.btn-start.act{background:rgba(0,230,118,.25);box-shadow:0 0 14px rgba(0,230,118,.5);}
-.btn-stop{background:rgba(255,23,68,.1);border-color:var(--red);color:var(--red);}
-.btn-reset{background:rgba(255,234,0,.08);border-color:var(--yellow);color:var(--yellow);}
+/* ── scrollbar ────────────────────────────── */
+::-webkit-scrollbar{width:6px;}
+::-webkit-scrollbar-track{background:#1a1a1a;}
+::-webkit-scrollbar-thumb{background:#444;border-radius:3px;}
+::-webkit-scrollbar-thumb:hover{background:#666;}
 
-/* Alarmliste */
-.alm-list{max-height:140px;overflow-y:auto;}
-.ae{display:flex;gap:6px;align-items:flex-start;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:9px;}
-.at{color:var(--dim);min-width:48px;}
-.ag{font-weight:bold;min-width:44px;}
-.ag.r{color:var(--red);}
-.ag.y{color:var(--yellow);}
-.ag.b{color:var(--accent);}
-.am{color:var(--text);}
-.no-alm{font-size:10px;color:var(--gray);text-align:center;padding:8px 0;}
-
-/* Runtime */
-.rt{font-size:20px;font-weight:bold;color:var(--accent);text-align:center;letter-spacing:3px;}
-
-/* scrollbar */
-::-webkit-scrollbar{width:3px;}
-::-webkit-scrollbar-track{background:var(--panel);}
-::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+/* ── PROGRESS BAR (Schritt) ───────────────── */
+.prog-row{display:flex;align-items:center;gap:6px;margin-top:4px;}
+.prog-bg{flex:1;height:8px;background:#2a2a2a;border:1px solid #444;border-radius:2px;overflow:hidden;}
+.prog-fill{height:100%;background:#0080c0;transition:width .5s;}
+.prog-pct{font-size:10px;color:#0080c0;min-width:35px;text-align:right;}
 </style>
 </head>
 <body>
 
-<!-- Titelleiste -->
-<div class="titlebar">
-  <div class="logo">SIMATIC</div>
-  <div class="title-center">PCS 7 &nbsp;|&nbsp; <span>WinCC OS</span> &nbsp;|&nbsp; Rohstoffverteilung R-1000 &nbsp;|&nbsp; PNK 1 · 172.16.10.11 &nbsp;/ PNK 2 · 172.16.10.12</div>
-  <div class="clock" id="clock">00:00:00</div>
+<div class="header">
+  <div class="header-left">
+    <div class="siemens-logo">SIMATIC</div>
+    <div class="header-title">
+      PCS 7 &nbsp;|&nbsp; <span>WinCC Professional</span>
+      &nbsp;|&nbsp; Reaktor R101 &nbsp;|&nbsp; PNK 1 · 172.16.10.11
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="mode-box">MODUS: <span id="hdr-mode">STOP</span></div>
+    <div class="clock-box" id="clock">00:00:00</div>
+  </div>
 </div>
 
-<!-- Statusleiste -->
-<div class="statusbar">
-  <div class="si"><div class="dot g" id="d-pnk1"></div>PNK 1</div>
-  <div class="si"><div class="dot g" id="d-pnk2"></div>PNK 2</div>
-  <div class="si"><div class="dot b"></div>SIMIT VC</div>
-  <div class="si"><div class="dot g"></div>OS-Server</div>
-  <div class="si"><div class="dot g" id="d-np1"></div>NP 111a</div>
-  <div class="si"><div class="dot g" id="d-np2"></div>NP 111b</div>
-  <div class="si" style="margin-left:auto;"><div class="dot" id="d-alm"></div><span id="alm-txt" style="font-size:10px;">KEIN ALARM</span></div>
+<div class="stepbar">
+  <span class="step-lbl">SFC:</span>
+  <div class="step-item" id="step0">S0 BEREIT</div>
+  <div class="step-item" id="step1">S1 VAKUUM</div>
+  <div class="step-item" id="step2">S2 N₂-FLUTEN</div>
+  <div class="step-item" id="step3">S3 DRUCKTEST</div>
+  <div class="step-item" id="step4">S4 ABLUFT</div>
+  <div class="step-item" id="step5">S5 DOSIEREN</div>
+  <div class="step-item" id="step6">S6 REAKTION</div>
+  <div class="step-item" id="step7">S7 ABKÜHLEN</div>
+  <div class="step-item" id="step8">S8 ABPUMPEN</div>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:6px;">
+    <div class="prog-bg" style="width:160px;"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+    <span class="prog-pct" id="prog-pct">0 %</span>
+  </div>
 </div>
 
-<!-- Hauptbereich -->
+<div class="btn-bar">
+  <button class="main-btn btn-auto" id="btn-auto" onclick="setMode('AUTO')">▶ AUTO START</button>
+  <button class="main-btn btn-hand" id="btn-hand" onclick="setMode('HAND')">✋ HAND</button>
+  <button class="main-btn btn-stop active-mode" id="btn-stop" onclick="setMode('STOP')">■ STOPP</button>
+  <div class="btn-bar-right">
+    <span style="font-size:10px;color:#555;">Charge:</span>
+    <span style="font-size:12px;color:#004080;font-weight:bold;" id="charge-no">CH-2026-001</span>
+    <button class="ack-btn" onclick="ackAlarms()">⚑ QUITTIEREN</button>
+  </div>
+</div>
+
 <div class="main">
 
-<!-- SVG Prozessfläche -->
-<div class="canvas-area">
-<svg id="ri" viewBox="0 0 720 560" xmlns="http://www.w3.org/2000/svg">
-<defs>
-  <linearGradient id="liqG" x1="0" y1="0" x2="1" y2="0">
-    <stop offset="0%" stop-color="#00538a"/>
-    <stop offset="50%" stop-color="#0077b6"/>
-    <stop offset="100%" stop-color="#00538a"/>
-  </linearGradient>
-  <linearGradient id="liqG2" x1="0" y1="0" x2="1" y2="0">
-    <stop offset="0%" stop-color="#00538a"/>
-    <stop offset="50%" stop-color="#005f87"/>
-    <stop offset="100%" stop-color="#00538a"/>
-  </linearGradient>
-  <clipPath id="tankClip"><rect x="261" y="41" width="118" height="130"/></clipPath>
-  <clipPath id="r1Clip"><rect x="61" y="441" width="118" height="100"/></clipPath>
-  <clipPath id="r2Clip"><rect x="541" y="441" width="118" height="100"/></clipPath>
-  <filter id="glow"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-</defs>
+<div class="left-col">
 
-<!-- ══════════════ ROHRE (Hintergrund) ══════════════ -->
-<!-- Raw Material Tank → NK111 (Zulaufventil) -->
-<line x1="320" y1="172" x2="320" y2="210" class="pipe"/>
-<line x1="320" y1="172" x2="320" y2="210" class="flow" id="f-tank-nk111"/>
+  <div class="svg-wrap">
+  <svg id="ri" viewBox="0 0 640 420" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="tankG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#c06000"/>
+      <stop offset="100%" stop-color="#804000"/>
+    </linearGradient>
+    <linearGradient id="bgG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#dedad2"/>
+      <stop offset="100%" stop-color="#c8c4bc"/>
+    </linearGradient>
+    <filter id="shadow"><feDropShadow dx="1" dy="1" stdDeviation="2" flood-opacity=".3"/></filter>
+    <clipPath id="tankClip"><rect x="201" y="81" width="178" height="240" rx="2"/></clipPath>
+  </defs>
 
-<!-- NK111 → Pumpenverteiler -->
-<line x1="320" y1="240" x2="320" y2="268" class="pipe"/>
-<line x1="320" y1="240" x2="320" y2="268" class="flow" id="f-nk111-pump"/>
+  <rect width="640" height="420" fill="url(#bgG)"/>
 
-<!-- Pumpenverteiler horizontal -->
-<line x1="240" y1="280" x2="400" y2="280" class="pipe"/>
-<line x1="240" y1="280" x2="400" y2="280" class="flow" id="f-pump-h"/>
+  <line x1="290" y1="81" x2="290" y2="40" stroke="#909090" stroke-width="6" stroke-linecap="round"/>
+  <line x1="290" y1="40" x2="100" y2="40" stroke="#909090" stroke-width="6" stroke-linecap="round"/>
+  <line x1="100" y1="40" x2="100" y2="70" stroke="#909090" stroke-width="6" stroke-linecap="round"/>
+  <rect x="70" y="70" width="60" height="34" rx="3" fill="#b0b0b0" stroke="#707070" stroke-width="1.5"/>
+  <text x="100" y="84" text-anchor="middle" font-size="8" fill="#303030" font-family="Courier New">Konden-</text>
+  <text x="100" y="95" text-anchor="middle" font-size="8" fill="#303030" font-family="Courier New">sator</text>
+  <rect x="268" y="55" width="44" height="18" rx="2" fill="#000" stroke="#555" stroke-width="1"/>
+  <text x="290" y="67" text-anchor="middle" font-size="9" fill="#00ff41" font-family="Courier New" id="abluft-pct-svg">0 %</text>
 
-<!-- NP111a (links) → Zusammenführung -->
-<line x1="240" y1="280" x2="240" y2="310" class="pipe"/>
-<line x1="240" y1="310" x2="320" y2="340" class="pipe"/>
-<line x1="240" y1="280" x2="240" y2="310" class="flow" id="f-np1-a"/>
-<line x1="240" y1="310" x2="320" y2="340" class="flow" id="f-np1-b"/>
+  <line x1="379" y1="120" x2="480" y2="120" stroke="#4060c0" stroke-width="5" stroke-linecap="round"/>
+  <line x1="480" y1="120" x2="480" y2="40" stroke="#4060c0" stroke-width="5" stroke-linecap="round"/>
+  <line x1="420" y1="40" x2="530" y2="40" stroke="#4060c0" stroke-width="5" stroke-linecap="round"/>
+  <ellipse cx="545" cy="35" rx="20" ry="14" fill="#3050a0" stroke="#6080d0" stroke-width="1.5"/>
+  <text x="545" y="39" text-anchor="middle" font-size="9" fill="#c0d0ff" font-family="Courier New">N₂</text>
 
-<!-- NP111b (rechts) → Zusammenführung -->
-<line x1="400" y1="280" x2="400" y2="310" class="pipe"/>
-<line x1="400" y1="310" x2="320" y2="340" class="pipe"/>
-<line x1="400" y1="280" x2="400" y2="310" class="flow" id="f-np2-a"/>
-<line x1="400" y1="310" x2="320" y2="340" class="flow" id="f-np2-b"/>
+  <line x1="320" y1="81" x2="320" y2="30" stroke="#606060" stroke-width="7" stroke-linecap="round"/>
+  <line x1="320" y1="30" x2="450" y2="30" stroke="#606060" stroke-width="5" stroke-linecap="round"/>
+  <text x="460" y="33" font-size="9" fill="#404040" font-family="Courier New">Produkt</text>
 
-<!-- → NK112 (FC111 Regelventil) -->
-<line x1="320" y1="340" x2="320" y2="372" class="pipe"/>
-<line x1="320" y1="340" x2="320" y2="372" class="flow" id="f-to-nk112"/>
+  <line x1="201" y1="160" x2="155" y2="160" stroke="#c04040" stroke-width="4" stroke-linecap="round"/>
+  <line x1="201" y1="230" x2="155" y2="230" stroke="#4080c0" stroke-width="4" stroke-linecap="round"/>
 
-<!-- NK112 → horizontale Verteilung -->
-<line x1="320" y1="402" x2="320" y2="420" class="pipe"/>
-<line x1="120" y1="420" x2="520" y2="420" class="pipe"/>
-<line x1="320" y1="402" x2="320" y2="420" class="flow" id="f-nk112-h1"/>
-<line x1="120" y1="420" x2="520" y2="420" class="flow" id="f-nk112-h2"/>
+  <line x1="290" y1="321" x2="290" y2="370" stroke="#606060" stroke-width="7" stroke-linecap="round"/>
+  <line x1="290" y1="370" x2="150" y2="370" stroke="#606060" stroke-width="5" stroke-linecap="round"/>
 
-<!-- → NK113 → Reactor 1 -->
-<line x1="120" y1="420" x2="120" y2="452" class="pipe"/>
-<line x1="120" y1="482" x2="120" y2="441" class="pipe"/>
-<line x1="120" y1="420" x2="120" y2="452" class="flow" id="f-nk113-a"/>
-<line x1="120" y1="482" x2="120" y2="445" class="flow" id="f-nk113-b"/>
+  <rect x="190" y="74" width="200" height="255" rx="8" fill="none" stroke="#888" stroke-width="3"/>
+  <rect x="200" y="80" width="180" height="242" rx="6" fill="#c8c4bc" stroke="#606060" stroke-width="2.5" filter="url(#shadow)"/>
+  <rect id="liq-r101" x="201" y="290" width="178" height="31"
+        clip-path="url(#tankClip)" fill="url(#tankG)" opacity=".85"/>
+  <line x1="200" y1="112" x2="380" y2="112" stroke="#cc0000" stroke-width="1" stroke-dasharray="5 3" opacity=".6"/>
+  <text x="385" y="115" font-size="8" fill="#cc0000" font-family="Courier New">MAX</text>
 
-<!-- → NK114 → Reactor 2 -->
-<line x1="520" y1="420" x2="520" y2="452" class="pipe"/>
-<line x1="520" y1="482" x2="520" y2="441" class="pipe"/>
-<line x1="520" y1="420" x2="520" y2="452" class="flow" id="f-nk114-a"/>
-<line x1="520" y1="482" x2="520" y2="445" class="flow" id="f-nk114-b"/>
+  <text x="290" y="175" text-anchor="middle" font-size="22" font-weight="bold" fill="#404040" font-family="Courier New" opacity=".3">R101</text>
 
-<!-- Sel Target Steuerlinie (gestrichelt) -->
-<polyline points="320,420 320,510 200,510" class="pipe-dash" id="sel-line"/>
-<line x1="120" y1="510" x2="120" y2="460" class="pipe-dash"/>
-<line x1="320" y1="510" x2="520" y2="510" class="pipe-dash"/>
-<line x1="520" y1="510" x2="520" y2="460" class="pipe-dash"/>
+  <line id="agit-line" x1="290" y1="140" x2="290" y2="280" stroke="#606060" stroke-width="3" stroke-linecap="round"/>
+  <polygon id="agit-poly" points="240,275 290,295 340,275 290,285"
+           fill="#808080" stroke="#505050" stroke-width="1.5"/>
+  <circle cx="290" cy="137" r="8" fill="#909090" stroke="#606060" stroke-width="1.5"/>
 
-<!-- FC111 Messleitung (gestrichelt) -->
-<line x1="380" y1="387" x2="440" y2="387" class="pipe-dash"/>
+  <rect x="272" y="78" width="36" height="20" rx="3" fill="#404040" stroke="#606060" stroke-width="1.5"/>
+  <text x="290" y="92" text-anchor="middle" font-size="9" fill="#a0c0a0" font-family="Courier New" id="agit-lbl">M</text>
 
-<!-- LI111 Messleitung (gestrichelt) -->
-<line x1="380" y1="80" x2="440" y2="80" class="pipe-dash"/>
-
-<!-- Set Vol Leitung (gestrichelt) -->
-<line x1="210" y1="80" x2="262" y2="80" class="pipe-dash"/>
-
-<!-- ══════════════ RAW MATERIAL TANK ══════════════ -->
-<!-- Behälter-Körper -->
-<rect x="261" y="41" width="118" height="130" rx="4" class="tank-body"/>
-<!-- Flüssigkeit -->
-<rect id="liq-tank" x="262" y="130" width="116" height="40"
-      clip-path="url(#tankClip)" fill="url(#liqG)"/>
-<!-- Deckel (konisch) -->
-<polyline points="261,44 320,22 379,44" class="tank-cap"/>
-<!-- Punkt (Schwimmer) -->
-<circle id="float-dot" cx="320" cy="120" r="5" fill="var(--accent)" filter="url(#glow)"/>
-<!-- Label -->
-<text x="320" y="105" text-anchor="middle" class="sec-lbl-main">R-1000</text>
-<text x="320" y="118" text-anchor="middle" class="sec-lbl">Raw Material Tank</text>
-
-<!-- ══════════════ INSTRUMENTE / REGLER ══════════════ -->
-
-<!-- LI 111 (Füllstand-Messumformer, rechts oben) -->
-<ellipse cx="462" cy="80" rx="22" ry="14" class="instr-ell"/>
-<text x="462" y="77" text-anchor="middle" class="instr-txt">LI</text>
-<text x="462" y="88" text-anchor="middle" class="instr-txt">111</text>
-
-<!-- LI 111 Wert -->
-<text id="li111-val" x="500" y="78" class="instr-val">--.-</text>
-<text x="500" y="89" class="instr-txt">%</text>
-
-<!-- Set Vol (Raute, links) -->
-<polygon points="190,80 210,67 230,80 210,93" class="diamond"/>
-<text x="210" y="77" text-anchor="middle" class="diamond-txt">Set</text>
-<text x="210" y="88" text-anchor="middle" class="diamond-txt">Vol</text>
-
-<!-- NK 111 Ventil (unter Tank) -->
-<!-- Ventilkörper: zwei Dreiecke (Siemens-Stil) -->
-<g id="vNK111">
-  <polygon points="308,210 332,210 320,228" class="valve-tri v-closed" id="vNK111-t1"/>
-  <polygon points="308,240 332,240 320,222" class="valve-tri v-closed" id="vNK111-t2"/>
-  <line x1="320" y1="210" x2="320" y2="240" stroke="var(--red)" stroke-width="1.5"/>
-</g>
-<ellipse cx="354" cy="224" rx="20" ry="12" class="instr-ell"/>
-<text x="354" y="221" text-anchor="middle" class="instr-txt">NK</text>
-<text x="354" y="231" text-anchor="middle" class="instr-txt">111</text>
-
-<!-- NP 111a PUMPE (links) -->
-<g id="pumpA">
-  <circle cx="240" cy="295" r="20" class="pump-ring"/>
-  <g id="pumpA-blade" class="pump-spin" style="transform-origin:240px 295px;animation:none;">
-    <line x1="240" y1="281" x2="240" y2="309" class="pump-arrow"/>
-    <line x1="226" y1="295" x2="254" y2="295" class="pump-arrow"/>
-    <line x1="230" y1="285" x2="250" y2="305" class="pump-arrow" opacity=".5"/>
-    <line x1="250" y1="285" x2="230" y2="305" class="pump-arrow" opacity=".5"/>
+  <g id="v-zulauf-g">
+    <polygon points="310,55 330,55 320,68" class="valve-tri" id="vz-t1" fill="rgba(255,0,0,.2)" stroke="#cc0000" stroke-width="2"/>
+    <polygon points="310,80 330,80 320,67" class="valve-tri" id="vz-t2" fill="rgba(255,0,0,.2)" stroke="#cc0000" stroke-width="2"/>
   </g>
-  <circle cx="240" cy="295" r="4" fill="var(--accent)"/>
-</g>
-<ellipse cx="196" cy="295" rx="20" ry="12" class="instr-ell"/>
-<text x="196" y="292" text-anchor="middle" class="instr-txt">NP</text>
-<text x="196" y="302" text-anchor="middle" class="instr-txt">111a</text>
+  <text x="336" y="68" font-size="9" fill="#400000" font-family="Courier New">V1</text>
 
-<!-- NP 111b PUMPE (rechts) -->
-<g id="pumpB">
-  <circle cx="400" cy="295" r="20" class="pump-ring"/>
-  <g id="pumpB-blade" class="pump-spin" style="transform-origin:400px 295px;animation:none;">
-    <line x1="400" y1="281" x2="400" y2="309" class="pump-arrow"/>
-    <line x1="386" y1="295" x2="414" y2="295" class="pump-arrow"/>
-    <line x1="390" y1="285" x2="410" y2="305" class="pump-arrow" opacity=".5"/>
-    <line x1="410" y1="285" x2="390" y2="305" class="pump-arrow" opacity=".5"/>
+  <g id="v-abluft-g">
+    <polygon points="280,40 300,40 290,52" id="va-t1" fill="rgba(150,150,150,.2)" stroke="#808080" stroke-width="2"/>
+    <polygon points="280,55 300,55 290,43" id="va-t2" fill="rgba(150,150,150,.2)" stroke="#808080" stroke-width="2"/>
   </g>
-  <circle cx="400" cy="295" r="4" fill="var(--accent)"/>
-</g>
-<ellipse cx="444" cy="295" rx="20" ry="12" class="instr-ell"/>
-<text x="444" y="292" text-anchor="middle" class="instr-txt">NP</text>
-<text x="444" y="302" text-anchor="middle" class="instr-txt">111b</text>
+  <text x="304" y="50" font-size="9" fill="#404040" font-family="Courier New">VA</text>
 
-<!-- NK 112 Regelventil + FC111 -->
-<g id="vNK112">
-  <polygon points="308,372 332,372 320,390" class="valve-tri v-closed" id="vNK112-t1"/>
-  <polygon points="308,402 332,402 320,384" class="valve-tri v-closed" id="vNK112-t2"/>
-  <line x1="320" y1="372" x2="320" y2="402" stroke="var(--red)" stroke-width="1.5"/>
-</g>
-<ellipse cx="354" cy="387" rx="20" ry="12" class="instr-ell"/>
-<text x="354" y="384" text-anchor="middle" class="instr-txt">NK</text>
-<text x="354" y="394" text-anchor="middle" class="instr-txt">112</text>
-<!-- FC 111 (Durchflussregler) -->
-<ellipse cx="458" cy="387" rx="22" ry="14" class="instr-ell"/>
-<text x="458" y="384" text-anchor="middle" class="instr-txt">FC</text>
-<text x="458" y="394" text-anchor="middle" class="instr-txt">111</text>
-<!-- FC Wert -->
-<text id="fc111-val" x="490" y="385" class="instr-val">--.-</text>
-<text x="490" y="395" class="instr-txt">m³/h</text>
+  <g id="v-n2-g">
+    <polygon points="470,112 490,112 480,125" id="vn2-t1" fill="rgba(60,100,200,.2)" stroke="#4060c0" stroke-width="2"/>
+    <polygon points="470,128 490,128 480,115" id="vn2-t2" fill="rgba(60,100,200,.2)" stroke="#4060c0" stroke-width="2"/>
+  </g>
+  <text x="494" y="123" font-size="9" fill="#203080" font-family="Courier New">N₂V</text>
 
-<!-- NK 113 Ventil → Reactor 1 -->
-<g id="vNK113">
-  <polygon points="108,452 132,452 120,470" class="valve-tri v-closed" id="vNK113-t1"/>
-  <polygon points="108,482 132,482 120,464" class="valve-tri v-closed" id="vNK113-t2"/>
-  <line x1="120" y1="452" x2="120" y2="482" stroke="var(--red)" stroke-width="1.5"/>
-</g>
-<ellipse cx="74" cy="467" rx="20" ry="12" class="instr-ell"/>
-<text x="74" y="464" text-anchor="middle" class="instr-txt">NK</text>
-<text x="74" y="474" text-anchor="middle" class="instr-txt">113</text>
+  <circle id="pump-circle" cx="190" cy="370" r="20" fill="#404040" stroke="#808080" stroke-width="2"/>
+  <g id="pump-blades" style="transform-origin:190px 370px;">
+    <line x1="190" y1="354" x2="190" y2="386" stroke="#a0a0a0" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="174" y1="370" x2="206" y2="370" stroke="#a0a0a0" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="179" y1="359" x2="201" y2="381" stroke="#a0a0a0" stroke-width="1.5" stroke-linecap="round" opacity=".6"/>
+    <line x1="201" y1="359" x2="179" y2="381" stroke="#a0a0a0" stroke-width="1.5" stroke-linecap="round" opacity=".6"/>
+  </g>
+  <text x="190" y="398" text-anchor="middle" font-size="9" fill="#404040" font-family="Courier New">M1</text>
 
-<!-- NK 114 Ventil → Reactor 2 -->
-<g id="vNK114">
-  <polygon points="508,452 532,452 520,470" class="valve-tri v-closed" id="vNK114-t1"/>
-  <polygon points="508,482 532,482 520,464" class="valve-tri v-closed" id="vNK114-t2"/>
-  <line x1="520" y1="452" x2="520" y2="482" stroke="var(--red)" stroke-width="1.5"/>
-</g>
-<ellipse cx="556" cy="467" rx="20" ry="12" class="instr-ell"/>
-<text x="556" y="464" text-anchor="middle" class="instr-txt">NK</text>
-<text x="556" y="474" text-anchor="middle" class="instr-txt">114</text>
+  <circle id="led-dampf" cx="145" cy="160" r="10" fill="#2a2a2a" stroke="#555" stroke-width="1.5"/>
+  <text x="145" y="164" text-anchor="middle" font-size="8" fill="#888" font-family="Courier New">D</text>
+  <text x="130" y="154" font-size="8" fill="#804040" font-family="Courier New">Dampf</text>
 
-<!-- ══════════════ REACTOR 1 ══════════════ -->
-<rect x="61" y="441" width="118" height="100" rx="4" class="tank-body"/>
-<rect id="liq-r1" x="62" y="510" width="116" height="30"
-      clip-path="url(#r1Clip)" fill="url(#liqG2)"/>
-<polyline points="61,444 120,425 179,444" class="tank-cap"/>
-<text x="120" y="478" text-anchor="middle" class="sec-lbl-main" font-size="12">R-1</text>
-<text x="120" y="492" text-anchor="middle" class="sec-lbl">Reactor 1</text>
-<!-- Füllstand Reactor 1 -->
-<text id="r1-pct" x="120" y="530" text-anchor="middle" class="instr-val" font-size="10">0 %</text>
-<!-- Alarm icon R1 -->
-<text id="alm-r1" x="120" y="462" text-anchor="middle" font-size="16" class="alm">⚠</text>
+  <circle id="led-wasser" cx="145" cy="230" r="10" fill="#2a2a2a" stroke="#555" stroke-width="1.5"/>
+  <text x="145" y="234" text-anchor="middle" font-size="8" fill="#888" font-family="Courier New">W</text>
+  <text x="130" y="224" font-size="8" fill="#404080" font-family="Courier New">Wasser</text>
 
-<!-- ══════════════ REACTOR 2 ══════════════ -->
-<rect x="541" y="441" width="118" height="100" rx="4" class="tank-body"/>
-<rect id="liq-r2" x="542" y="510" width="116" height="30"
-      clip-path="url(#r2Clip)" fill="url(#liqG2)"/>
-<polyline points="541,444 600,425 659,444" class="tank-cap"/>
-<text x="600" y="478" text-anchor="middle" class="sec-lbl-main" font-size="12">R-2</text>
-<text x="600" y="492" text-anchor="middle" class="sec-lbl">Reactor 2</text>
-<!-- Füllstand Reactor 2 -->
-<text id="r2-pct" x="600" y="530" text-anchor="middle" class="instr-val" font-size="10">0 %</text>
-<!-- Alarm icon R2 -->
-<text id="alm-r2" x="600" y="462" text-anchor="middle" font-size="16" class="alm">⚠</text>
+  <rect x="392" y="175" width="64" height="36" rx="2" fill="#000" stroke="#555" stroke-width="1.5"/>
+  <text x="424" y="188" text-anchor="middle" font-size="8" fill="#4080c0" font-family="Courier New">LIC-101</text>
+  <text id="lic-svg" x="424" y="203" text-anchor="middle" font-size="11" fill="#00ff41" font-weight="bold" font-family="Courier New">0</text>
+  <line x1="380" y1="193" x2="392" y2="193" stroke="#555" stroke-width="1.5" stroke-dasharray="3 2"/>
+  <text x="460" y="196" font-size="8" fill="#606060" font-family="Courier New">m³</text>
 
-<!-- Sel Target Raute (Mitte unten) -->
-<polygon points="300,510 320,498 340,510 320,522" class="diamond"/>
-<text x="320" y="507" text-anchor="middle" class="diamond-txt">Sel</text>
-<text x="320" y="518" text-anchor="middle" class="diamond-txt">Target</text>
+  <rect x="392" y="220" width="64" height="36" rx="2" fill="#000" stroke="#555" stroke-width="1.5"/>
+  <text x="424" y="233" text-anchor="middle" font-size="8" fill="#4080c0" font-family="Courier New">TIC-101</text>
+  <text id="tic-svg" x="424" y="248" text-anchor="middle" font-size="11" fill="#00ff41" font-weight="bold" font-family="Courier New">20.0</text>
+  <line x1="380" y1="238" x2="392" y2="238" stroke="#555" stroke-width="1.5" stroke-dasharray="3 2"/>
+  <text x="460" y="241" font-size="8" fill="#606060" font-family="Courier New">°C</text>
 
-<!-- Alarm Tank -->
-<text id="alm-tank" x="320" y="60" text-anchor="middle" font-size="18" class="alm" filter="url(#glow)">⚠</text>
+  <rect x="392" y="265" width="64" height="36" rx="2" fill="#000" stroke="#555" stroke-width="1.5"/>
+  <text x="424" y="278" text-anchor="middle" font-size="8" fill="#4080c0" font-family="Courier New">PIC-101</text>
+  <text id="pic-svg" x="424" y="293" text-anchor="middle" font-size="11" fill="#00ff41" font-weight="bold" font-family="Courier New">1013</text>
+  <line x1="380" y1="283" x2="392" y2="283" stroke="#555" stroke-width="1.5" stroke-dasharray="3 2"/>
+  <text x="460" y="286" font-size="8" fill="#606060" font-family="Courier New">mbar</text>
 
-</svg>
-</div><!-- /canvas-area -->
+  <line x1="196" y1="81" x2="196" y2="321" stroke="#888" stroke-width="1" opacity=".4"/>
+  <text x="192" y="84" text-anchor="end" font-size="7" fill="#888" font-family="Courier New">100%</text>
+  <text x="192" y="202" text-anchor="end" font-size="7" fill="#888" font-family="Courier New">50%</text>
+  <text x="192" y="322" text-anchor="end" font-size="7" fill="#888" font-family="Courier New">0%</text>
 
-<!-- ══════════════ RECHTES PANEL ══════════════ -->
-<div class="rpanel">
+  <text id="alm-r101" x="290" y="220" text-anchor="middle" font-size="36" fill="#ff0000" opacity="0">⚠</text>
 
-  <!-- Messwerte -->
-  <div class="rblock">
-    <div class="rtitle">📊 Messwerte</div>
-
-    <div class="mrow">
-      <span class="ml">LI-111 Füllstand Tank</span>
-      <span><span class="mv" id="pv-li111">0.0</span><span class="mu">%</span></span>
-    </div>
-    <div class="bar-bg"><div class="bar" id="bar-li111" style="width:0%"></div></div>
-
-    <div class="mrow" style="margin-top:6px;">
-      <span class="ml">FC-111 Durchfluss</span>
-      <span><span class="mv" id="pv-fc111">0.0</span><span class="mu">m³/h</span></span>
-    </div>
-
-    <div class="mrow">
-      <span class="ml">Füllstand Reactor 1</span>
-      <span><span class="mv" id="pv-r1">0.0</span><span class="mu">%</span></span>
-    </div>
-    <div class="bar-bg"><div class="bar" id="bar-r1" style="width:0%"></div></div>
-
-    <div class="mrow" style="margin-top:6px;">
-      <span class="ml">Füllstand Reactor 2</span>
-      <span><span class="mv" id="pv-r2">0.0</span><span class="mu">%</span></span>
-    </div>
-    <div class="bar-bg"><div class="bar" id="bar-r2" style="width:0%"></div></div>
-
-    <div class="mrow" style="margin-top:6px;">
-      <span class="ml">NP 111a Status</span>
-      <span class="mv" id="pv-np1" style="color:var(--gray)">AUS</span>
-    </div>
-    <div class="mrow">
-      <span class="ml">NP 111b Status</span>
-      <span class="mv" id="pv-np2" style="color:var(--gray)">AUS</span>
+  </svg>
+  </div><div class="panel">
+    <div class="panel-title">Messwerte – R101</div>
+    <div class="io-grid">
+      <div class="io-field">
+        <div class="io-label">LIC-101  FÜLLSTAND</div>
+        <div><span class="io-value" id="io-lic">0</span><span class="io-unit">m³ / 1500</span></div>
+      </div>
+      <div class="io-field">
+        <div class="io-label">TIC-101  TEMPERATUR IST/SOLL</div>
+        <div><span class="io-value" id="io-tic">20.0</span><span class="io-unit">°C / </span><span class="io-value" id="io-tic-sp" style="font-size:14px;color:#80d0ff;">20.0</span><span class="io-unit">°C</span></div>
+      </div>
+      <div class="io-field">
+        <div class="io-label">PIC-101  DRUCK</div>
+        <div><span class="io-value" id="io-pic">1013</span><span class="io-unit">mbar</span></div>
+      </div>
+      <div class="io-field">
+        <div class="io-label">V_ABLUFT  REGELVENTIL</div>
+        <div><span class="io-value" id="io-abluft">0</span><span class="io-unit">%</span></div>
+      </div>
     </div>
   </div>
 
-  <!-- Ziel-Selektor -->
-  <div class="rblock">
-    <div class="rtitle">🎯 Sel Target – Zielreaktor</div>
-    <div class="sel-row">
-      <div class="sel-btn active" id="sel-r1" onclick="setTarget(1)">▶ Reactor 1</div>
-      <div class="sel-btn" id="sel-r2" onclick="setTarget(2)">▶ Reactor 2</div>
-      <div class="sel-btn" id="sel-both" onclick="setTarget(3)">▶ BEIDE</div>
-    </div>
-    <div style="text-align:center;font-size:9px;color:var(--dim);margin-top:3px;" id="sel-info">Ziel: Reactor 1</div>
-  </div>
+</div><div class="right-col">
 
-  <!-- Set Vol Setpoint -->
-  <div class="rblock">
-    <div class="rtitle">⚙ Set Vol – Sollwert</div>
-    <div class="sp-row">
-      <span class="sp-lbl">Sollvolumen</span>
-      <input type="range" id="sp-vol" min="10" max="100" value="60" oninput="updateSP()"/>
-      <span class="sp-val" id="sp-val">60 %</span>
-    </div>
-    <div style="font-size:9px;color:var(--dim);text-align:center;">
-      Stopp-Grenzwert für Zielreaktor
+  <div class="panel" style="display:flex;flex-direction:column;flex:1;min-height:0;">
+    <div class="panel-title">Alarmliste / Meldungen</div>
+    <div class="alarm-box" id="alarm-box">
+      <div class="no-alarm" id="no-alm-msg">Keine Meldungen</div>
     </div>
   </div>
 
-  <!-- Grenzwerte -->
-  <div class="rblock">
-    <div class="rtitle">⚠ Grenzwerte</div>
-    <div class="mrow"><span class="ml">HH Tank (Alarm)</span><span class="mv" style="color:var(--red)">90 %</span></div>
-    <div class="mrow"><span class="ml">H Tank (Warn)</span><span class="mv" style="color:var(--orange)">80 %</span></div>
-    <div class="mrow"><span class="ml">Reactor Voll</span><span class="mv" style="color:var(--orange)" id="sp-lim">60 %</span></div>
-  </div>
-
-  <!-- Steuerung -->
-  <div class="rblock">
-    <div class="rtitle">🎛 Steuerung</div>
-    <div class="btn-row">
-      <button class="btn btn-start" id="btn-start" onclick="startSim()">▶ START</button>
-      <button class="btn btn-stop"  onclick="stopSim()">■ STOP</button>
-      <button class="btn btn-reset" onclick="resetSim()">↺ RESET</button>
-    </div>
-    <div style="margin-top:6px;text-align:center;font-size:9px;color:var(--dim);">
-      Modus: <span id="mode-txt" style="color:var(--accent);">HAND / LOKAL</span>
+  <div class="panel">
+    <div class="panel-title">Aktoren – Status</div>
+    <div style="display:flex;flex-direction:column;gap:4px;">
+      <div class="sw-row"><span class="sw-lbl">V_Zulauf</span><div class="led off" id="led-vzulauf"></div><span id="lbl-vzulauf" style="font-size:10px;color:#600;">AUS</span></div>
+      <div class="sw-row"><span class="sw-lbl">Pumpe M1</span><div class="led off" id="led-pump"></div><span id="lbl-pump" style="font-size:10px;color:#600;">AUS</span></div>
+      <div class="sw-row"><span class="sw-lbl">V_Heizen</span><div class="led off" id="led-heizen"></div><span id="lbl-heizen" style="font-size:10px;color:#600;">AUS</span></div>
+      <div class="sw-row"><span class="sw-lbl">V_Kühlen</span><div class="led off" id="led-kuehlen"></div><span id="lbl-kuehlen" style="font-size:10px;color:#600;">AUS</span></div>
+      <div class="sw-row"><span class="sw-lbl">Agitator</span><div class="led off" id="led-agit"></div><span id="lbl-agit" style="font-size:10px;color:#600;">AUS</span></div>
+      <div class="sw-row"><span class="sw-lbl">V_N2</span><div class="led off" id="led-n2"></div><span id="lbl-n2" style="font-size:10px;color:#600;">AUS</span></div>
     </div>
   </div>
 
-  <!-- Laufzeit -->
-  <div class="rblock">
-    <div class="rtitle">⏱ Laufzeit NP 111</div>
-    <div class="rt" id="rt">00:00:00</div>
-  </div>
-
-  <!-- Alarmliste -->
-  <div class="rblock" style="flex:1;">
-    <div class="rtitle">🚨 Alarmliste</div>
-    <div class="alm-list" id="alm-list">
-      <div class="no-alm" id="no-alm">Keine aktiven Alarme</div>
+  <div class="hand-panel">
+    <div class="hand-title">✋ MANUELLER EINGRIFF (nur HAND)</div>
+    <div class="switch-grid">
+      <div class="sw-row">
+        <span class="sw-lbl">V_Zulauf</span>
+        <div class="led off" id="h-led-zulauf"></div>
+        <button class="sw-btn sw-off" id="h-btn-zulauf" onclick="handToggle('vzulauf')" disabled>EIN</button>
+      </div>
+      <div class="sw-row">
+        <span class="sw-lbl">Pumpe M1</span>
+        <div class="led off" id="h-led-pump"></div>
+        <button class="sw-btn sw-off" id="h-btn-pump" onclick="handToggle('pump')" disabled>EIN</button>
+      </div>
+      <div class="sw-row">
+        <span class="sw-lbl">V_Heizen</span>
+        <div class="led off" id="h-led-heizen"></div>
+        <button class="sw-btn sw-off" id="h-btn-heizen" onclick="handToggle('heizen')" disabled>EIN</button>
+      </div>
+      <div class="sw-row">
+        <span class="sw-lbl">V_Kühlen</span>
+        <div class="led off" id="h-led-kuehlen"></div>
+        <button class="sw-btn sw-off" id="h-btn-kuehlen" onclick="handToggle('kuehlen')" disabled>EIN</button>
+      </div>
+      <div class="sw-row">
+        <span class="sw-lbl">Agitator</span>
+        <div class="led off" id="h-led-agit"></div>
+        <button class="sw-btn sw-off" id="h-btn-agit" onclick="handToggle('agit')" disabled>EIN</button>
+      </div>
+      <div class="sw-row">
+        <span class="sw-lbl">V_N2</span>
+        <div class="led off" id="h-led-n2"></div>
+        <button class="sw-btn sw-off" id="h-btn-n2" onclick="handToggle('vn2')" disabled>EIN</button>
+      </div>
+    </div>
+    <div class="slider-row">
+      <div class="slider-lbl">TIC-Soll: <span id="sp-val">20</span> °C</div>
+      <input type="range" id="sp-slider" min="15" max="70" value="20"
+             oninput="updateSP()" disabled/>
+    </div>
+    <div class="slider-row" style="margin-top:4px;">
+      <div class="slider-lbl">V_Abluft: <span id="abluft-val">0</span> %</div>
+      <input type="range" id="abluft-slider" min="0" max="100" value="0"
+             oninput="updateAbluft()" disabled/>
     </div>
   </div>
 
-</div><!-- /rpanel -->
-</div><!-- /main -->
+</div></div><script>
+// ════════════════════════════════════════════════════════════════
+// PROZESSSTATUS
+// ════════════════════════════════════════════════════════════════
+const P={
+  mode:'STOP',     // STOP | HAND | AUTO
+  step:0,          // SFC-Schritt 0-8
+  stepTimer:0,     // Ticks in aktuellem Schritt
 
-<script>
-// ════════════════════════════════════════════════════════════
-// State
-// ════════════════════════════════════════════════════════════
-const S = {
-  running: false,
-  tankLvl: 85.0,   // %  (Rohstofftank startet voll)
-  r1Lvl:   0.0,
-  r2Lvl:   0.0,
-  fc111:   0.0,
-  target:  1,       // 1=R1, 2=R2, 3=beide
-  setVol:  60,      // %
-  rtSec:   0,
-  alarms:  [],
-  // alarm flags
-  almTankHH: false,
-  almTankH:  false,
-  almR1full: false,
-  almR2full: false,
+  // Analogwerte
+  level:0.0,       // m³ (0-1500)
+  temp:20.0,       // °C
+  tempSP:20.0,     // Sollwert
+  press:1013.0,    // mbar
+  abluft:0.0,      // % Regelventil
+
+  // Aktoren
+  vzulauf:false,
+  pump:false,
+  heizen:false,
+  kuehlen:false,
+  agit:false,
+  vn2:false,
+
+  // Flags
+  almTempHigh:false,
+  almPressLow:false,
+  almLevelLow:false,
+  chargeNo:1,
+  rtSec:0,
+  alarms:[],
 };
 
-// ════════════════════════════════════════════════════════════
-// Uhr
-// ════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════
+// UHRZEIT
+// ════════════════════════════════════════════════════════════════
 function tick(){
-  document.getElementById('clock').textContent =
+  document.getElementById('clock').textContent=
     new Date().toLocaleTimeString('de-DE',{hour12:false});
 }
 setInterval(tick,1000); tick();
 
-// ════════════════════════════════════════════════════════════
-// Hilfsfunktionen
-// ════════════════════════════════════════════════════════════
-function setFlow(ids, on){
-  ids.forEach(id=>{
-    const el=document.getElementById(id);
-    if(el){ on?el.classList.add('on'):el.classList.remove('on'); }
-  });
-}
-
-function setValve(prefix, open){
-  ['t1','t2'].forEach(s=>{
-    const el=document.getElementById(prefix+'-'+s);
-    if(!el) return;
-    if(open){ el.classList.remove('v-closed'); el.classList.add('v-open'); }
-    else     { el.classList.remove('v-open');   el.classList.add('v-closed'); }
-  });
-  // Trennlinie Farbe
-  const parent=document.getElementById(prefix);
-  if(parent){
-    const line=parent.querySelector('line');
-    if(line) line.setAttribute('stroke', open?'var(--green)':'var(--red)');
-  }
-}
-
-function setPump(id, blade_id, on){
-  const b=document.getElementById(blade_id);
-  if(b) b.style.animation = on ? 'spin .7s linear infinite' : 'none';
-  const dot = id==='A'?'d-np1':'d-np2';
-  const pvId= id==='A'?'pv-np1':'pv-np2';
-  document.getElementById(dot).className = on?'dot g':'dot';
-  const el=document.getElementById(pvId);
-  el.textContent = on?'EIN':'AUS';
-  el.style.color  = on?'var(--green)':'var(--gray)';
-}
-
-function addAlarm(tag, msg, type='r'){
+// ════════════════════════════════════════════════════════════════
+// ALARM
+// ════════════════════════════════════════════════════════════════
+function addAlarm(msg, type='info'){
   const t=new Date().toLocaleTimeString('de-DE',{hour12:false});
-  S.alarms.unshift({t,tag,msg,type});
+  const icon = type==='crit'?'🔥':type==='warn'?'⚠️':'ℹ️';
+  P.alarms.unshift({t,msg,type,icon});
+  if(P.alarms.length>20) P.alarms.pop();
   renderAlarms();
 }
-
 function renderAlarms(){
-  const list=document.getElementById('alm-list');
-  const noalm=document.getElementById('no-alm');
-  list.innerHTML='';
-  if(S.alarms.length===0){ list.appendChild(noalm); noalm.style.display='block'; return; }
-  noalm.style.display='none';
-  S.alarms.slice(0,20).forEach(a=>{
+  const box=document.getElementById('alarm-box');
+  const nm=document.getElementById('no-alm-msg');
+  box.innerHTML='';
+  if(P.alarms.length===0){box.appendChild(nm);nm.style.display='block';return;}
+  nm.style.display='none';
+  P.alarms.slice(0,8).forEach(a=>{
     const d=document.createElement('div');
-    d.className='ae';
-    d.innerHTML=`<span class="at">${a.t}</span><span class="ag ${a.type}">${a.tag}</span><span class="am">${a.msg}</span>`;
-    list.appendChild(d);
+    d.className='alarm-row '+a.type;
+    d.innerHTML=`<span class="a-icon">${a.icon}</span><span class="a-time">${a.t}</span><span class="a-msg">${a.msg}</span>`;
+    box.appendChild(d);
   });
 }
-
-function setAlarmStatus(on){
-  const dot=document.getElementById('d-alm');
-  const txt=document.getElementById('alm-txt');
-  dot.className = on?'dot r':'dot g';
-  txt.textContent = on?'⚠ ALARM':'KEIN ALARM';
-  txt.style.color  = on?'var(--red)':'';
+function ackAlarms(){
+  P.alarms=[];
+  P.almTempHigh=false;P.almPressLow=false;P.almLevelLow=false;
+  renderAlarms();
+  addAlarm('Alarme quittiert','info');
 }
 
-function fmtRt(s){
-  return [Math.floor(s/3600),Math.floor(s%3600/60),s%60]
-    .map(v=>String(v).padStart(2,'0')).join(':');
-}
-
-// ════════════════════════════════════════════════════════════
-// Tank-Visualisierung
-// ════════════════════════════════════════════════════════════
-function updateTankVis(id, clipId, lvl, maxH, tankTopY, tankBotY){
-  const el=document.getElementById(id);
-  if(!el) return;
-  const h=Math.max(0,(lvl/100)*maxH);
-  const y=tankBotY-h;
-  el.setAttribute('y',y);
-  el.setAttribute('height',h);
-  el.setAttribute('fill', lvl>=90?'rgba(255,23,68,.65)':lvl>=80?'rgba(255,109,0,.55)':'url(#liqG)');
-}
-
-function updateRVis(id, lvl, maxH, topY, botY, fillId){
-  const el=document.getElementById(id);
-  if(!el) return;
-  const h=Math.max(0,(lvl/100)*maxH);
-  const y=botY-h;
-  el.setAttribute('y',y);
-  el.setAttribute('height',h);
-  el.setAttribute('fill', lvl>=S.setVol?'rgba(255,109,0,.55)':'url(#liqG2)');
-  const pct=document.getElementById(fillId);
-  if(pct) pct.textContent=lvl.toFixed(1)+' %';
-}
-
-// Schwimmer-Animation
-function updateFloat(lvl){
-  const dot=document.getElementById('float-dot');
-  if(!dot) return;
-  // y: bei 100% → ca. 45, bei 0% → ca. 165
-  const y = 165 - (lvl/100)*120;
-  dot.setAttribute('cy', y);
-}
-
-// ════════════════════════════════════════════════════════════
-// Panel-Update
-// ════════════════════════════════════════════════════════════
-function updatePanel(){
-  // LI 111
-  const li=S.tankLvl.toFixed(1);
-  document.getElementById('pv-li111').textContent=li;
-  document.getElementById('li111-val').textContent=li;
-  const barL=document.getElementById('bar-li111');
-  barL.style.width=li+'%';
-  barL.className='bar'+(S.tankLvl>=90?' a':S.tankLvl>=80?' w':'');
-  const pvLi=document.getElementById('pv-li111');
-  pvLi.className='mv'+(S.tankLvl>=80?' alarm':'');
-
-  // FC 111
-  document.getElementById('pv-fc111').textContent=S.fc111.toFixed(1);
-  document.getElementById('fc111-val').textContent=S.fc111.toFixed(1);
-
-  // R1
-  const r1=S.r1Lvl.toFixed(1);
-  document.getElementById('pv-r1').textContent=r1;
-  const br1=document.getElementById('bar-r1');
-  br1.style.width=r1+'%';
-  br1.className='bar'+(S.r1Lvl>=S.setVol?' w':'');
-
-  // R2
-  const r2=S.r2Lvl.toFixed(1);
-  document.getElementById('pv-r2').textContent=r2;
-  const br2=document.getElementById('bar-r2');
-  br2.style.width=r2+'%';
-  br2.className='bar'+(S.r2Lvl>=S.setVol?' w':'');
-
-  // Runtime
-  document.getElementById('rt').textContent=fmtRt(S.rtSec);
-}
-
-// ════════════════════════════════════════════════════════════
-// Sel Target
-// ════════════════════════════════════════════════════════════
-function setTarget(t){
-  S.target=t;
-  ['sel-r1','sel-r2','sel-both'].forEach((id,i)=>{
-    document.getElementById(id).classList.toggle('active', i+1===t);
+// ════════════════════════════════════════════════════════════════
+// MODUS
+// ════════════════════════════════════════════════════════════════
+function setMode(m){
+  const prev=P.mode;
+  P.mode=m;
+  document.getElementById('hdr-mode').textContent=m;
+  ['auto','hand','stop'].forEach(id=>{
+    document.getElementById('btn-'+id).classList.remove('active-mode');
   });
-  const names=['Reactor 1','Reactor 2','R1 & R2 (beide)'];
-  document.getElementById('sel-info').textContent='Ziel: '+names[t-1];
+  document.getElementById('btn-'+m.toLowerCase()).classList.add('active-mode');
+
+  // HAND-Controls en/disablen
+  const isHand=m==='HAND';
+  ['zulauf','pump','heizen','kuehlen','agit','n2'].forEach(k=>{
+    const btn=document.getElementById('h-btn-'+k);
+    if(btn) btn.disabled=!isHand;
+  });
+  document.getElementById('sp-slider').disabled=!isHand;
+  document.getElementById('abluft-slider').disabled=!isHand;
+
+  if(m==='STOP'){
+    P.step=0; P.stepTimer=0;
+    allActorsOff();
+    addAlarm('Anlage gestoppt – Modus: STOP','warn');
+  } else if(m==='AUTO'){
+    if(prev==='STOP'){
+      P.step=1; P.stepTimer=0;
+      P.chargeNo++;
+      document.getElementById('charge-no').textContent='CH-2026-00'+P.chargeNo;
+      addAlarm('AUTO-Start: Charge CH-2026-00'+P.chargeNo,'info');
+    }
+  } else if(m==='HAND'){
+    addAlarm('Umschaltung auf HAND-Modus','warn');
+  }
 }
 
+function allActorsOff(){
+  P.vzulauf=false;P.pump=false;P.heizen=false;
+  P.kuehlen=false;P.agit=false;P.vn2=false;
+  P.abluft=0;
+}
+
+// ════════════════════════════════════════════════════════════════
+// HAND-SCHALTER
+// ════════════════════════════════════════════════════════════════
+function handToggle(key){
+  if(P.mode!=='HAND') return;
+  P[key]=!P[key];
+  addAlarm(`HAND: ${key.toUpperCase()} → ${P[key]?'EIN':'AUS'}`,'info');
+  updatePanel();
+}
 function updateSP(){
-  S.setVol=parseInt(document.getElementById('sp-vol').value);
-  document.getElementById('sp-val').textContent=S.setVol+' %';
-  document.getElementById('sp-lim').textContent=S.setVol+' %';
+  P.tempSP=parseInt(document.getElementById('sp-slider').value);
+  document.getElementById('sp-val').textContent=P.tempSP;
+}
+function updateAbluft(){
+  P.abluft=parseInt(document.getElementById('abluft-slider').value);
+  document.getElementById('abluft-val').textContent=P.abluft;
 }
 
-// ════════════════════════════════════════════════════════════
-// Alarm-Logik
-// ════════════════════════════════════════════════════════════
-function checkAlarms(){
-  let anyAlm=false;
+// ════════════════════════════════════════════════════════════════
+// SFC STATE MACHINE
+// ════════════════════════════════════════════════════════════════
+function runSFC(){
+  if(P.mode!=='AUTO') return;
 
-  // Tank HH
-  if(S.tankLvl>=90 && !S.almTankHH){
-    S.almTankHH=true; anyAlm=true;
-    addAlarm('LI-111','Füllstand Tank HH ≥ 90% – ALARM!','r');
-    document.getElementById('alm-tank').classList.add('blink');
-  }
-  // Tank H (Vorwarnung)
-  if(S.tankLvl>=80 && !S.almTankH){
-    S.almTankH=true;
-    addAlarm('LI-111','Füllstand Tank H ≥ 80% – Vorwarnung','y');
-  }
-  // Tank leer
-  if(S.tankLvl<=2 && S.running){
-    addAlarm('LI-111','Rohstofftank leer – Pumpen stoppen!','r');
-    stopSim(true);
-    return;
-  }
+  switch(P.step){
 
-  // R1 voll
-  if(S.r1Lvl>=S.setVol && !S.almR1full && (S.target===1||S.target===3)){
-    S.almR1full=true; anyAlm=true;
-    addAlarm('NK-113','Reactor 1 erreicht Sollvolumen '+S.setVol+'%','y');
-    document.getElementById('alm-r1').classList.add('blink');
-    // NK113 schließen
-    setValve('vNK113',false);
-    setFlow(['f-nk113-a','f-nk113-b'],false);
-    if(S.target===1) stopSim(true);
-  }
+    // S1: VAKUUM – Abluft 100%, Druck → 20 mbar
+    case 1:
+      P.abluft=100; P.press=Math.max(20, P.press - 35);
+      if(P.press<=22){
+        addAlarm('S1: Vakuum erreicht ('+P.press.toFixed(0)+' mbar)','info');
+        P.step=2; P.stepTimer=0;
+      }
+      break;
 
-  // R2 voll
-  if(S.r2Lvl>=S.setVol && !S.almR2full && (S.target===2||S.target===3)){
-    S.almR2full=true; anyAlm=true;
-    addAlarm('NK-114','Reactor 2 erreicht Sollvolumen '+S.setVol+'%','y');
-    document.getElementById('alm-r2').classList.add('blink');
-    setValve('vNK114',false);
-    setFlow(['f-nk114-a','f-nk114-b'],false);
-    if(S.target===2) stopSim(true);
-  }
+    // S2: N2-FLUTEN – Abluft zu, N2 auf, Druck → 1000 mbar
+    case 2:
+      P.abluft=0; P.vn2=true;
+      P.press=Math.min(1000, P.press + 55);
+      if(P.press>=998){
+        addAlarm('S2: N₂-Flutung abgeschlossen','info');
+        P.step=3; P.stepTimer=0; P.vn2=false;
+      }
+      break;
 
-  // Beide voll bei target=3
-  if(S.target===3 && S.almR1full && S.almR2full && S.running){
-    addAlarm('SYS','Beide Reaktoren voll – Anlage stoppt','b');
-    stopSim(true);
-  }
+    // S3: DRUCKTEST – 15s Haltezeit (≈30 Ticks à 500ms)
+    case 3:
+      P.stepTimer++;
+      if(P.stepTimer>=30){
+        addAlarm('S3: Drucktest OK – kein Leck','info');
+        P.step=4; P.stepTimer=0;
+      }
+      break;
 
-  if(anyAlm) setAlarmStatus(true);
+    // S4: ABLUFT öffnen (10%-Schritte)
+    case 4:
+      if(P.abluft<100) P.abluft=Math.min(100,P.abluft+10);
+      P.stepTimer++;
+      if(P.stepTimer>=12){
+        addAlarm('S4: Abluft offen ('+P.abluft+'%)','info');
+        P.step=5; P.stepTimer=0; P.abluft=0;
+      }
+      break;
+
+    // S5: DOSIEREN – Zulauf auf, TIC-SP 60°C, bis 1200 m³
+    case 5:
+      P.tempSP=60;
+      if(P.level>=225) P.agit=true;   // Rührerschutz
+      // Pause wenn Temp > 65°C
+      if(P.temp>65){
+        P.vzulauf=false;
+        if(!P.almTempHigh){ addAlarm('S5: Zulauf PAUSE – Temp > 65°C','warn'); P.almTempHigh=true; }
+      } else {
+        P.vzulauf=true; P.almTempHigh=false;
+      }
+      if(P.level>=1200){
+        P.vzulauf=false;
+        addAlarm('S5: Dosierung abgeschlossen (1200 m³)','info');
+        P.step=6; P.stepTimer=0;
+      }
+      break;
+
+    // S6: REAKTION – Zulauf zu, 15s Rühren
+    case 6:
+      P.vzulauf=false; P.agit=true;
+      P.stepTimer++;
+      if(P.stepTimer>=30){
+        addAlarm('S6: Reaktionszeit abgeschlossen','info');
+        P.step=7; P.stepTimer=0;
+      }
+      break;
+
+    // S7: ABKÜHLEN – TIC-SP 30°C, warten bis ≤32°C
+    case 7:
+      P.tempSP=30;
+      if(P.temp<=32){
+        addAlarm('S7: Abkühlung OK ('+P.temp.toFixed(1)+'°C)','info');
+        P.step=8; P.stepTimer=0;
+      }
+      break;
+
+    // S8: ABPUMPEN – Pumpe bis Level=0
+    case 8:
+      P.agit=false;
+      P.pump=true;
+      if(P.level<=0){
+        P.pump=false;
+        addAlarm('S8: Abpumpen abgeschlossen – Charge fertig 🎉','info');
+        setMode('STOP');
+        P.step=0;
+      }
+      break;
+  }
 }
 
-// ════════════════════════════════════════════════════════════
-// Simulation Tick
-// ════════════════════════════════════════════════════════════
-let simInterval=null;
+// ════════════════════════════════════════════════════════════════
+// PROZESSPHYSIK
+// ════════════════════════════════════════════════════════════════
+function runPhysics(){
+  // Exothermie: Zulauf
+  if(P.vzulauf){ P.level=Math.min(1500,P.level+15); P.temp+=1.8; }
 
-function simTick(){
-  if(!S.running) return;
-  S.rtSec++;
+  // Pumpe: Ablauf
+  if(P.pump){ P.level=Math.max(0,P.level-20); }
 
-  // Durchfluss je nach aktivem Zweig
-  const r1Active=(S.target===1||S.target===3)&&S.r1Lvl<S.setVol;
-  const r2Active=(S.target===2||S.target===3)&&S.r2Lvl<S.setVol;
-  const numActive=(r1Active?1:0)+(r2Active?1:0);
+  // Split-Range Temperaturregler
+  if(P.temp>P.tempSP+1){ P.heizen=false; P.kuehlen=true; }
+  else if(P.temp<P.tempSP-1){ P.heizen=true; P.kuehlen=false; }
+  else{ P.heizen=false; P.kuehlen=false; }
 
-  const totalFlow = numActive>0 ? (15.0 + (Math.random()-.5)*1.5) : 0;
-  const flowPer   = numActive>0 ? totalFlow/numActive : 0;
+  // Wärme/Kühle Effekte
+  if(P.heizen) P.temp=Math.min(70, P.temp+0.8);
+  if(P.kuehlen) P.temp=Math.max(15,P.temp-1.2);
+  // Natürliche Abkühlung
+  if(!P.heizen&&!P.kuehlen) P.temp+=(20-P.temp)*0.01;
 
-  S.fc111 = totalFlow;
+  // ── VERRIEGELUNGEN ──────────────────────
+  // IL1: Rührer
+  if(P.level<225 && P.agit){
+    P.agit=false;
+    if(!P.almLevelLow){ addAlarm('IL-1: Rührer AUS – Level < 15%','warn'); P.almLevelLow=true; }
+  } else if(P.level>=225) P.almLevelLow=false;
 
-  // Tank entleert sich
-  const drainRate = totalFlow>0 ? totalFlow*0.004 : 0;
-  S.tankLvl = Math.max(0, S.tankLvl - drainRate);
+  // IL2: Übertemperatur
+  if(P.temp>=70){
+    if(P.vzulauf||P.heizen){
+      P.vzulauf=false; P.heizen=false;
+      if(!P.almTempHigh){ addAlarm('IL-2: NOT-AUS Zulauf – Temp ≥ 70°C 🔥','crit'); P.almTempHigh=true; }
+    }
+  } else P.almTempHigh=false;
 
-  // Reaktoren füllen
-  if(r1Active) S.r1Lvl = Math.min(100, S.r1Lvl + flowPer*0.006 + Math.random()*.05);
-  if(r2Active) S.r2Lvl = Math.min(100, S.r2Lvl + flowPer*0.006 + Math.random()*.05);
+  // IL3: Kristallisationsschutz
+  if(P.temp<=15.5 && P.kuehlen){
+    P.kuehlen=false;
+    addAlarm('IL-3: Kühlen gesperrt – Kristallisationsgefahr','warn');
+  }
 
-  // Visualisierung
-  updateTankVis('liq-tank','tankClip',S.tankLvl,130,41,171);
-  updateRVis('liq-r1',S.r1Lvl,99,441,540,'r1-pct');
-  updateRVis('liq-r2',S.r2Lvl,99,441,540,'r2-pct');
-  updateFloat(S.tankLvl);
-
-  // Flows
-  setFlow(['f-tank-nk111','f-nk111-pump','f-pump-h'],true);
-  setFlow(['f-np1-a','f-np1-b'],true);
-  setFlow(['f-np2-a','f-np2-b'],true);
-  setFlow(['f-to-nk112','f-nk112-h1','f-nk112-h2'],numActive>0);
-
-  if(r1Active && !S.almR1full) setFlow(['f-nk113-a','f-nk113-b'],true);
-  if(r2Active && !S.almR2full) setFlow(['f-nk114-a','f-nk114-b'],true);
-
-  checkAlarms();
-  updatePanel();
+  // Druck: normalisiert sich wenn keine aktiven Ventile
+  if(!P.vn2 && P.abluft<50) P.press+=(1013-P.press)*0.02;
 }
 
-// ════════════════════════════════════════════════════════════
-// START
-// ════════════════════════════════════════════════════════════
-function startSim(){
-  if(S.running) return;
-  S.running=true;
-
-  // Alle relevanten Ventile öffnen
-  setValve('vNK111',true);
-  setValve('vNK112',true);
-  if(S.target===1||S.target===3) setValve('vNK113',true);
-  if(S.target===2||S.target===3) setValve('vNK114',true);
-
-  // Pumpen starten
-  setPump('A','pumpA-blade',true);
-  setPump('B','pumpB-blade',true);
-
-  document.getElementById('btn-start').classList.add('act');
-  document.getElementById('mode-txt').textContent='AUTO / FERN';
-
-  addAlarm('SYS','Dosierung gestartet – Ziel: '+(S.target===1?'Reactor 1':S.target===2?'Reactor 2':'Beide'),'b');
-
-  simInterval=setInterval(simTick,600);
+// ════════════════════════════════════════════════════════════════
+// SCHRITTKETTE PANEL
+// ════════════════════════════════════════════════════════════════
+function updateStepBar(){
+  for(let i=0;i<=8;i++){
+    const el=document.getElementById('step'+i);
+    if(!el) continue;
+    el.classList.remove('active','done');
+    if(P.mode==='AUTO'){
+      if(i<P.step) el.classList.add('done');
+      else if(i===P.step) el.classList.add('active');
+    }
+  }
+  const pct = P.mode==='AUTO' ? Math.round((P.step/8)*100) : 0;
+  document.getElementById('prog-fill').style.width=pct+'%';
+  document.getElementById('prog-pct').textContent=pct+' %';
 }
 
-// ════════════════════════════════════════════════════════════
-// STOP
-// ════════════════════════════════════════════════════════════
-function stopSim(auto=false){
-  S.running=false;
-  clearInterval(simInterval);
+// ════════════════════════════════════════════════════════════════
+// SVG UPDATE
+// ════════════════════════════════════════════════════════════════
+function updateSVG(){
+  const pct=P.level/1500;
+  const maxH=240, tankBot=321;
+  const h=Math.max(0,pct*maxH);
+  const y=tankBot-h;
+  const liq=document.getElementById('liq-r101');
+  liq.setAttribute('y',y); liq.setAttribute('height',h);
+  liq.setAttribute('fill', P.temp>65?'#cc2020':P.temp>50?'#c06000':'url(#tankG)');
 
-  setValve('vNK111',false);
-  setValve('vNK112',false);
-  setValve('vNK113',false);
-  setValve('vNK114',false);
+  // Sensor SVG Werte
+  document.getElementById('lic-svg').textContent=P.level.toFixed(0);
+  document.getElementById('tic-svg').textContent=P.temp.toFixed(1);
+  document.getElementById('pic-svg').textContent=P.press.toFixed(0);
+  document.getElementById('abluft-pct-svg').textContent=P.abluft.toFixed(0)+' %';
 
-  setPump('A','pumpA-blade',false);
-  setPump('B','pumpB-blade',false);
+  // Rührer
+  const agC=P.agit?'#00ff41':'#606060';
+  document.getElementById('agit-line').setAttribute('stroke',agC);
+  document.getElementById('agit-poly').setAttribute('fill',P.agit?'#004000':'#808080');
+  document.getElementById('agit-poly').setAttribute('stroke',agC);
+  document.getElementById('agit-lbl').setAttribute('fill',P.agit?'#80ff80':'#a0c0a0');
+  // Rührer dreht
+  const b=document.getElementById('pump-blades');
+  b.style.animation=P.pump?'spin .6s linear infinite':'none';
 
-  setFlow([
-    'f-tank-nk111','f-nk111-pump','f-pump-h',
-    'f-np1-a','f-np1-b','f-np2-a','f-np2-b',
-    'f-to-nk112','f-nk112-h1','f-nk112-h2',
-    'f-nk113-a','f-nk113-b','f-nk114-a','f-nk114-b'
-  ],false);
+  // Dampf/Wasser LED im SVG
+  const ld=document.getElementById('led-dampf');
+  ld.setAttribute('fill',P.heizen?'#dd0000':'#2a2a2a');
+  if(P.heizen) ld.setAttribute('filter','url(#shadow)'); else ld.removeAttribute('filter');
 
-  S.fc111=0;
-  document.getElementById('btn-start').classList.remove('act');
-  document.getElementById('mode-txt').textContent=auto?'AUTO-STOP':'HAND / LOKAL';
-  if(!auto) addAlarm('SYS','Anlage manuell gestoppt','b');
-  updatePanel();
+  const lw=document.getElementById('led-wasser');
+  lw.setAttribute('fill',P.kuehlen?'#0060cc':'#2a2a2a');
+
+  // Ventile SVG Farbe
+  setValveSVG('vz',P.vzulauf);
+  setValveSVG('va',P.abluft>0);
+  setValveSVG('vn2',P.vn2); // KORRIGIERT: Nur 'vn2' übergeben
+
+  // Alarm overlay
+  const almR=document.getElementById('alm-r101');
+  const showAlm=P.temp>=68||P.level>=1450;
+  almR.style.opacity=showAlm?'1':'0';
+  if(showAlm) almR.style.animation='blink-svg .5s step-start infinite';
+  else almR.style.animation='none';
+
+  // Pumpe SVG
+  document.getElementById('pump-circle').setAttribute('fill',P.pump?'#004000':'#404040');
 }
 
-// ════════════════════════════════════════════════════════════
-// RESET
-// ════════════════════════════════════════════════════════════
-function resetSim(){
-  stopSim();
-  S.tankLvl=85; S.r1Lvl=0; S.r2Lvl=0; S.fc111=0;
-  S.rtSec=0; S.alarms=[];
-  S.almTankHH=false; S.almTankH=false;
-  S.almR1full=false; S.almR2full=false;
+function setValveSVG(prefix,open){
+  const c = open ? '#00cc00' : '#cc0000';
+  const f = open ? 'rgba(0,180,0,.25)' : 'rgba(200,0,0,.2)';
+  [prefix+'-t1', prefix+'-t2'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el){ el.setAttribute('stroke',c); el.setAttribute('fill',f); }
+  });
+}
 
-  updateTankVis('liq-tank','tankClip',S.tankLvl,130,41,171);
-  updateRVis('liq-r1',0,99,441,540,'r1-pct');
-  updateRVis('liq-r2',0,99,441,540,'r2-pct');
-  updateFloat(S.tankLvl);
-  updatePanel();
-  setAlarmStatus(false);
-  renderAlarms();
+// ════════════════════════════════════════════════════════════════
+// STATUS PANEL UPDATE
+// ════════════════════════════════════════════════════════════════
+function setLED(id,on,color='g'){
+  const el=document.getElementById(id);
+  if(!el) return;
+  el.className='led '+(on?'on-'+color:'off');
+}
+function setLbl(id,on){
+  const el=document.getElementById(id);
+  if(!el) return;
+  el.textContent=on?'EIN':'AUS';
+  el.style.color=on?'#008000':'#600000';
+}
 
-  ['alm-tank','alm-r1','alm-r2'].forEach(id=>{
-    const el=document.getElementById(id);
-    if(el){el.classList.remove('blink');el.style.opacity='0';}
+function updatePanel(){
+  // I/O Felder
+  const lvl=P.level.toFixed(0);
+  const tmp=P.temp.toFixed(1);
+  const prs=P.press.toFixed(0);
+
+  const ioLic=document.getElementById('io-lic');
+  ioLic.textContent=lvl;
+  ioLic.className='io-value'+(P.level>=1400?' alarm':P.level>=1200?' warn':'');
+
+  const ioTic=document.getElementById('io-tic');
+  ioTic.textContent=tmp;
+  ioTic.className='io-value'+(P.temp>=68?' alarm':P.temp>=60?' warn':'');
+
+  document.getElementById('io-tic-sp').textContent=P.tempSP.toFixed(0);
+  document.getElementById('io-pic').textContent=prs;
+  document.getElementById('io-abluft').textContent=P.abluft.toFixed(0);
+
+  // KORRIGIERT: Slider visuell mit der Automatik synchronisieren
+  const spSlider = document.getElementById('sp-slider');
+  const abluftSlider = document.getElementById('abluft-slider');
+  
+  if (spSlider && abluftSlider) {
+    spSlider.value = P.tempSP;
+    abluftSlider.value = P.abluft;
+    document.getElementById('sp-val').textContent = P.tempSP.toFixed(0);
+    document.getElementById('abluft-val').textContent = P.abluft.toFixed(0);
+  }
+
+  // LEDs rechts
+  setLED('led-vzulauf',P.vzulauf,'g'); setLbl('lbl-vzulauf',P.vzulauf);
+  setLED('led-pump',P.pump,'g');       setLbl('lbl-pump',P.pump);
+  setLED('led-heizen',P.heizen,'r');   setLbl('lbl-heizen',P.heizen);
+  setLED('led-kuehlen',P.kuehlen,'y'); setLbl('lbl-kuehlen',P.kuehlen);
+  setLED('led-agit',P.agit,'g');       setLbl('lbl-agit',P.agit);
+  setLED('led-n2',P.vn2,'y');          setLbl('lbl-n2',P.vn2);
+
+  // Hand-LEDs spiegeln
+  ['zulauf','pump','heizen','kuehlen','agit','n2'].forEach(k=>{
+    const map={zulauf:'vzulauf',pump:'pump',heizen:'heizen',kuehlen:'kuehlen',agit:'agit',n2:'vn2'};
+    const val=P[map[k]||k];
+    const hl=document.getElementById('h-led-'+k);
+    if(hl) hl.className='led '+(val?'on-g':'off');
+    const hb=document.getElementById('h-btn-'+k);
+    if(hb){ hb.textContent=val?'AUS':'EIN'; hb.className='sw-btn '+(val?'sw-on':'sw-off'); }
   });
 
-  document.getElementById('li111-val').textContent=S.tankLvl.toFixed(1);
-  document.getElementById('fc111-val').textContent='--.-';
-  document.getElementById('mode-txt').textContent='HAND / LOKAL';
-  addAlarm('SYS','System-Reset – Quittierung OK','b');
-  renderAlarms();
+  updateSVG();
+  updateStepBar();
 }
+
+// ════════════════════════════════════════════════════════════════
+// HAUPT-SIMULATIONSSCHLEIFE
+// ════════════════════════════════════════════════════════════════
+function simLoop(){
+  if(P.mode!=='STOP'){
+    runSFC();
+    runPhysics();
+    P.rtSec++;
+  }
+  updatePanel();
+}
+
+setInterval(simLoop, 500);
+
+// CSS Animation für SVG Alarm
+const styleEl=document.createElement('style');
+styleEl.textContent=`
+@keyframes blink-svg{50%{opacity:0;}0%,100%{opacity:1;}}
+@keyframes spin{to{transform:rotate(360deg);}}
+#pump-blades{transform-origin:190px 370px;}
+`;
+document.head.appendChild(styleEl);
 
 // Init
-updateTankVis('liq-tank','tankClip',S.tankLvl,130,41,171);
-updateFloat(S.tankLvl);
+addAlarm('System gestartet – Modus: STOP','info');
+addAlarm('PCS 7 OS verbunden – PNK 1: 172.16.10.11','info');
 updatePanel();
 renderAlarms();
-document.getElementById('li111-val').textContent=S.tankLvl.toFixed(1);
 </script>
 </body>
 </html>
